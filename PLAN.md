@@ -118,9 +118,8 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–7 done** (v1 L0+MQTT). Post-v1 locked as **W14**.  
-**Next:** Step **8** (polish) → Step **9** (thin scene host) → Step **10** (B-http **or** L1).  
-Step **8 done**. Next: Step **9** (thin scene host).
+Steps **0–9 done**. Post-v1 locked as **W14**.  
+**Next:** Step **10** — pick **B-http** or early **L1** at go time.
 
 ---
 
@@ -311,10 +310,12 @@ Device already publishes `wd/{id}/ack|status|lwt`. Harden: ack includes `seq`/`i
 ---
 
 ### Step 9 — Thin scene host (theme D)
-**Status:** `todo` · **Depends on:** Step 8  
+**Status:** `done` (2026-09-09) · **Depends on:** Step 8  
 Python composer: dirty rects / scene steps, auto encode (`codec_encode_auto` / CLI), multi-device publish. Device stays dumb L0. Builds on `wd_demo.py` / `wd_mqtt.py` — not a full UI toolkit.
 
 **Done when:** `tools/` can drive a multi-rect “scene” from a small script/YAML without hand-packing each inject; documented in README.
+
+**Delivered:** `tools/wd_scene.py` + `tools/scenes/hello.yaml`; `make scene`. ✓
 
 ---
 

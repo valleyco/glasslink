@@ -9,7 +9,7 @@
 Copied/adapted patterns:
 
 - CYD pins: SCLK 14, MOSI 13, CS 15, DC 2, RST -1, BL 21
-- ST7789 via `esp_lcd` (not ILI9341), landscape `swap_xy`, mirrors off
+- ST7789 via `esp_lcd` (not ILI9341), landscape `swap_xy`, **mirror_x on** (invaders used mirrors off + game H-flip; we have no convert H-flip)
 - RGB565 byteswap on TX
 - Dual strip buffers + SPI color-done semaphore
 

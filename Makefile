@@ -4,7 +4,7 @@ IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
 .PHONY: test test-render test-codec test-contract bench-codec mqtt-loopback \
-	sim sim-mqtt demo demo-fetch demo-sim clean \
+	sim sim-mqtt demo demo-fetch demo-sim scene clean \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
@@ -49,6 +49,12 @@ demo-sim:
 	$(MAKE) -C host/sim all
 	$(MAKE) -C host/mqtt all
 	tools/.venv/bin/python tools/wd_demo.py --device sim1 --visual
+
+# YAML scene composer (Step 9). Override: make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
+SCENE ?= tools/scenes/hello.yaml
+scene:
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_scene.py $(SCENE) --device $${WD_DEVICE:-cyd1}
 
 build: build-esp32
 

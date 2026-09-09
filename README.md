@@ -49,6 +49,18 @@ Manual:
 
 ---
 
+## Scenes (YAML → MQTT)
+
+Thin host composer (`tools/wd_scene.py`): multi-step L0 scenes without hand-packing injects. Ops: `clear`, `fill`, `checker`, `banner`, `image`, `sleep`. Multi-device via YAML `devices:` or repeated `--device`.
+
+```bash
+make scene                                    # tools/scenes/hello.yaml → cyd1
+make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
+./tools/wd_scene.py tools/scenes/hello.yaml --device cyd1
+```
+
+---
+
 ## Device (CYD)
 
 Device id is a **configured name** (NVS key `device_id` / `CONFIG_WD_DEVICE_ID`, e.g. `cyd1`) — not derived from MAC. Host tools use `--device` or env `WD_DEVICE`. Topics: [`docs/contract/topics-v1.md`](docs/contract/topics-v1.md).
@@ -83,6 +95,8 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 | `host/` | gcc tests, fake_display, SDL sim |
 | `tools/wd_mqtt.py` | inject / loopback / visual |
 | `tools/wd_demo.py` | orchestrated demo |
+| `tools/wd_scene.py` | YAML scene composer |
+| `tools/scenes/` | example scenes |
 | `docs/contract/` | wire formats + MQTT topics |
 
 Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
@@ -100,7 +114,7 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 | ID | Area | Notes |
 |----|------|-------|
-| — | — | None open for Step 8 polish (B-demo-text fixed via `tools/wd_text.py`). |
+| B-mirror | ST7789 MADCTL | Glass was L–R mirrored vs host intent (invaders-style mirrors-off). Fix: `esp_lcd_panel_mirror(true, false)` in `cyd_display_spi.c` — **needs reflash** to verify. |
 
 ---
 
