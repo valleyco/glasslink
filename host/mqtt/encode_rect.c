@@ -1,6 +1,7 @@
 /*
  * Encode stdin raw RGB565 (w*h*2) to stdout codec bitstream.
- * encode_rect --enc raw|delta --w W --h H < raw > out
+ * encode_rect --enc raw|delta|auto --w W --h H < raw > out
+ * With --enc auto, prints chosen enc name on stderr.
  */
 
 #include "codec.h"
@@ -12,21 +13,27 @@
 int main(int argc, char **argv)
 {
     codec_enc_t enc = CODEC_ENC_RAW_RGB565;
+    int use_auto = 0;
     int w = 0, h = 0;
     size_t need, got, bound, out_len = 0;
     uint16_t *rgb;
     uint8_t *out;
     int rc;
+    codec_enc_t chosen = CODEC_ENC_RAW_RGB565;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--enc") == 0 && i + 1 < argc) {
             i++;
             if (strcmp(argv[i], "raw") == 0) {
                 enc = CODEC_ENC_RAW_RGB565;
+                use_auto = 0;
             } else if (strcmp(argv[i], "delta") == 0) {
                 enc = CODEC_ENC_DELTA_RLE_V1;
+                use_auto = 0;
+            } else if (strcmp(argv[i], "auto") == 0) {
+                use_auto = 1;
             } else {
-                fprintf(stderr, "bad enc\n");
+                fprintf(stderr, "bad enc (raw|delta|auto)\n");
                 return 2;
             }
         } else if (strcmp(argv[i], "--w") == 0 && i + 1 < argc) {
@@ -50,13 +57,26 @@ int main(int argc, char **argv)
         free(rgb);
         return 2;
     }
-    bound = codec_encode_bound(enc, w, h);
+    bound = use_auto ? codec_encode_bound(CODEC_ENC_DELTA_RLE_V1, w, h)
+                     : codec_encode_bound(enc, w, h);
+    if (use_auto) {
+        size_t raw_b = codec_encode_bound(CODEC_ENC_RAW_RGB565, w, h);
+        if (raw_b > bound) {
+            bound = raw_b;
+        }
+    }
     out = (uint8_t *)malloc(bound);
     if (!out) {
         free(rgb);
         return 2;
     }
-    rc = codec_encode(enc, rgb, w, h, out, bound, &out_len);
+    if (use_auto) {
+        rc = codec_encode_auto(rgb, w, h, out, bound, &out_len, &chosen);
+        fprintf(stderr, "enc=%s\n",
+                chosen == CODEC_ENC_DELTA_RLE_V1 ? "delta" : "raw");
+    } else {
+        rc = codec_encode(enc, rgb, w, h, out, bound, &out_len);
+    }
     free(rgb);
     if (rc != CODEC_OK) {
         fprintf(stderr, "encode rc=%d\n", rc);

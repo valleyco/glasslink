@@ -164,16 +164,29 @@ def ensure_encode_rect() -> Path:
     return enc_bin
 
 
-def encode_rgb(enc_name: str, w: int, h: int, raw: bytes) -> bytes:
-    """Encode raw RGB565 LE pixels via host encode_rect CLI."""
+def encode_rgb(enc_name: str, w: int, h: int, raw: bytes) -> tuple[str, bytes]:
+    """Encode raw RGB565 LE pixels via host encode_rect CLI.
+
+    Returns (chosen_enc_name, payload). For enc_name 'auto', chosen is 'raw' or 'delta'.
+    """
     need = w * h * 2
     if len(raw) != need:
         raise ValueError(f"rgb size {len(raw)} != {need} for {w}x{h}")
     enc_bin = ensure_encode_rect()
-    return subprocess.check_output(
+    r = subprocess.run(
         [str(enc_bin), "--enc", enc_name, "--w", str(w), "--h", str(h)],
         input=raw,
+        capture_output=True,
+        check=True,
     )
+    chosen = enc_name
+    if enc_name == "auto":
+        # stderr: enc=raw|delta
+        for line in r.stderr.decode().splitlines():
+            if line.startswith("enc="):
+                chosen = line.split("=", 1)[1].strip()
+                break
+    return chosen, r.stdout
 
 
 def enc_id(name: str) -> int:
@@ -185,6 +198,8 @@ def build_rect_payload(args: argparse.Namespace) -> tuple[int, bytes]:
     enc_name = args.enc
     if args.payload_file:
         data = Path(args.payload_file).read_bytes()
+        if enc_name == "auto":
+            raise ValueError("--payload-file cannot use --enc auto")
         return enc_id(enc_name), data
 
     if args.rgb_file:
@@ -198,7 +213,10 @@ def build_rect_payload(args: argparse.Namespace) -> tuple[int, bytes]:
 
     if enc_name == "raw":
         return ENC_RAW, raw
-    return ENC_DELTA, encode_rgb("delta", args.w, args.h, raw)
+    chosen, data = encode_rgb(enc_name if enc_name != "delta" else "delta", args.w, args.h, raw)
+    if enc_name == "delta":
+        return ENC_DELTA, data
+    return enc_id(chosen), data
 
 
 def check_inline_max(msg: bytes, *, enforce: bool) -> None:
@@ -402,7 +420,7 @@ def cmd_loopback(args: argparse.Namespace) -> int:
 
     # 3) delta solid rect
     dx, dy, dw, dh = 100, 50, 16, 8
-    delta_blue = encode_rgb("delta", dw, dh, rgb565_fill(dw, dh, 0x001F))
+    delta_blue = encode_rgb("delta", dw, dh, rgb565_fill(dw, dh, 0x001F))[1]
     cases.append(
         (
             "delta-rect",
@@ -416,7 +434,7 @@ def cmd_loopback(args: argparse.Namespace) -> int:
     cx, cy, cw, ch = 40, 80, 12, 6
     c0, c1 = 0xF800, 0x001F
     checker = rgb565_checker(cw, ch, c0, c1)
-    delta_chk = encode_rgb("delta", cw, ch, checker)
+    delta_chk = encode_rgb("delta", cw, ch, checker)[1]
     cases.append(
         (
             "delta-checker",
@@ -536,7 +554,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--y", type=int, default=0)
     r.add_argument("--w", type=int, default=8)
     r.add_argument("--h", type=int, default=8)
-    r.add_argument("--enc", choices=("raw", "delta"), default="raw")
+    r.add_argument("--enc", choices=("raw", "delta", "auto"), default="raw")
     r.add_argument("--solid", type=lambda s: int(s, 0), default=0xF800)
     r.add_argument(
         "--solid2",

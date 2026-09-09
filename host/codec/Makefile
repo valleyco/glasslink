@@ -15,7 +15,7 @@ CODEC_SRCS := \
 
 GEN_SRCS := gen/corpus_gen.c
 
-TEST_BINS := test_codec_raw test_codec_delta_rle
+TEST_BINS := test_codec_raw test_codec_delta_rle test_codec_auto
 BENCH_BIN := bench_codec
 MD_OUT ?= $(ROOT)/docs/benches/codec-bench-mvp.md
 
@@ -28,6 +28,9 @@ test_codec_raw: test_codec_raw.c $(CODEC_SRCS)
 
 test_codec_delta_rle: test_codec_delta_rle.c $(CODEC_SRCS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ test_codec_delta_rle.c $(CODEC_SRCS)
+
+test_codec_auto: test_codec_auto.c $(CODEC_SRCS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ test_codec_auto.c $(CODEC_SRCS)
 
 $(BENCH_BIN): bench_main.c $(CODEC_SRCS) $(GEN_SRCS)
 	$(CC) $(BENCH_CFLAGS) $(CPPFLAGS) -o $@ bench_main.c $(CODEC_SRCS) $(GEN_SRCS) -lm

@@ -1,6 +1,7 @@
-# delta_rle_v1 bitstream (correctness freeze candidate)
+# delta_rle_v1 bitstream (**FROZEN** — Step 7, 2026-09-09)
 
-`enc = CODEC_ENC_DELTA_RLE_V1` (1). Host/device C in `components/codec`.
+`enc = CODEC_ENC_DELTA_RLE_V1` (1). Host/device C in `components/codec`.  
+See also [`docs/benches/codec-v1.md`](../benches/codec-v1.md).
 
 ## Prediction (RGB565 samples, uint16 wrap)
 

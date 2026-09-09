@@ -117,7 +117,7 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–6d done** (host path + SDL sim + glass MQTT E2E with NVS creds). **Next: Step 7** — codec tune/freeze.
+Steps **0–7 done**. `delta_rle_v1` frozen; host `codec_encode_auto` (raw if no gain). Product path complete for v1 L0+MQTT; backlog is B-* / L1.
 
 ---
 
@@ -277,18 +277,13 @@ Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB56
 ---
 
 ### Step 7 — Compression tune, compare, freeze v1
-**Status:** `todo` · **Depends on:** Step 2a–2b (host-only; **not** required for 6h)  
-See [`docs/codec-harness.md`](docs/codec-harness.md) + [`docs/research-codecs.md`](docs/research-codecs.md).
+**Status:** `done` (2026-09-09) · **Depends on:** Step 2a–2b  
 
-**Ordering note:** Can run after 6h without hardware. Prefer a first glass smoke with **raw** (6d) before a long sweep if the goal is “does Wi‑Fi+SPI work?”; freeze bitstreams before relying on delta on-device.
+**Freeze:** KEEP `raw_rgb565` + `delta_rle_v1` (v_then_h + byte RLE). Primary geo-mean **~37.7×** on UI/sparse/solid/runs. Doc: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).  
+**Host policy:** `codec_encode_auto` / `encode_rect --enc auto` (raw if `comp ≥ 0.98×raw`).  
+**Deferred:** QOI/JPEG/plain-RLE/predict knobs → backlog / `delta_rle_v2` host experiments.
 
-- Knob sweeps (predict order, RLE style, planes/YUV experiments)
-- Compare: raw, plain RLE, delta_rle profiles, mini-qoi, optional JPEG full-frame
-- Encoder policy: auto-raw if no gain
-- Primary score: geo-mean ratio on **UI/sparse** classes under scratch budget
-- Freeze `delta_rle_v1` goldens + bitstream doc; archive sweep notes
-
-**Done when:** `docs/benches/codec-v1.md` has chosen profile + tables + keep/kill decision.
+**Done when:** `docs/benches/codec-v1.md` has chosen profile + tables + keep/kill decision. ✓
 
 ---
 

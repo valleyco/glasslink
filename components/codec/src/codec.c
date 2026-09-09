@@ -50,3 +50,36 @@ int codec_decode_rows(codec_enc_t enc, int w, int h, const uint8_t *in,
         return CODEC_ERR_ARG;
     }
 }
+
+int codec_encode_auto(const uint16_t *rgb, int w, int h, uint8_t *out,
+                      size_t out_cap, size_t *out_len, codec_enc_t *chosen)
+{
+    size_t raw_bytes;
+    size_t delta_len = 0;
+    int rc;
+
+    if (!rgb || !out || !out_len || w <= 0 || h <= 0) {
+        return CODEC_ERR_ARG;
+    }
+    raw_bytes = (size_t)w * (size_t)h * sizeof(uint16_t);
+    rc = codec_encode(CODEC_ENC_DELTA_RLE_V1, rgb, w, h, out, out_cap, &delta_len);
+    if (rc != CODEC_OK) {
+        return rc;
+    }
+    /* Prefer raw when delta is not a clear win (≥98% of raw size). */
+    if (delta_len * 100u >= raw_bytes * 98u) {
+        rc = codec_encode(CODEC_ENC_RAW_RGB565, rgb, w, h, out, out_cap, out_len);
+        if (rc != CODEC_OK) {
+            return rc;
+        }
+        if (chosen) {
+            *chosen = CODEC_ENC_RAW_RGB565;
+        }
+        return CODEC_OK;
+    }
+    *out_len = delta_len;
+    if (chosen) {
+        *chosen = CODEC_ENC_DELTA_RLE_V1;
+    }
+    return CODEC_OK;
+}
