@@ -120,7 +120,7 @@ No production feature lands without a failing host test written first (except pu
 
 Steps **0–7 done** (v1 L0+MQTT). Post-v1 locked as **W14**.  
 **Next:** Step **8** (polish) → Step **9** (thin scene host) → Step **10** (B-http **or** L1).  
-Step 8 **in progress**.
+Step **8 done**. Next: Step **9** (thin scene host).
 
 ---
 
@@ -291,19 +291,19 @@ Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB56
 ---
 
 ### Step 8 — Product polish (theme A)
-**Status:** `in progress` · **Depends on:** Steps 0–7 · **Decision:** W14  
+**Status:** `done` (2026-09-09) · **Depends on:** Steps 0–7 · **Decision:** W14  
 Make demos and day-to-day MQTT use trustworthy. Still L0-only on device.
 
 #### Step 8a — Readable host demo text
-**Status:** `todo`  
+**Status:** `done`  
 Fix **B-demo-text**: replace Pillow `load_default` banners with a readable embedded bitmap (or TTF) font → RGB565 L0 rects. No device font / L1 yet.
 
 #### Step 8b — Ack / status / LWT hygiene
-**Status:** `todo`  
+**Status:** `done`  
 Device already publishes `wd/{id}/ack|status|lwt`. Harden: ack includes `seq`/`id`/`rc`; status includes `device_id` + `inline_max`; document topics; host inject/demo can optionally wait for ack. Rely on esp-mqtt auto-reconnect; republish online+status on `CONNECTED` (already).
 
 #### Step 8c — Device-id story
-**Status:** `todo`  
+**Status:** `done`  
 **Freeze:** configured name via NVS/`CONFIG_WD_DEVICE_ID` (e.g. `cyd1`) — **not** MAC suffix for v1. Document in README + open questions closed. Env `WD_DEVICE` for host tools.
 
 **Done when:** B-demo-text resolved or closed; topic/ack contract noted in docs; device-id decision written; host can observe ack on inject.
@@ -346,7 +346,7 @@ Do **not** start both in parallel. Codec v2 / LVGL stay backlog.
 | B-http | HTTP `uri` pull when inline_max insufficient (W7 phase 2) — candidate Step 10-B |
 | B-cbor | CBOR/generic envelope when L1/bind need it (replace or sit beside binary) |
 | B-s3 | Build/verify profile #2 (S3+PSRAM) when hardware appears |
-| B-demo-text | Demo banner font (tracked in Step 8a) |
+| B-demo-text | Demo banner font — **fixed** Step 8a (`wd_text.py`) |
 
 ---
 
@@ -393,5 +393,6 @@ make build flash monitor   # IDF device (later)
 ## Open questions (short list)
 
 1. Dev Wi-Fi/MQTT credentials: **NVS namespace `wd`** (agreed 2026-09-09) — load first; seed from Kconfig once; `make flash-nvs` for CSV provision. Secrets never in git.
-2. Device id: MAC suffix vs configured name.
-3. Exact binary header layout (settle in Step 3 with tests) — magic/`ver`/`type`/`id`/geom/`enc`/`len`.
+2. Device id: **configured name** (NVS / `CONFIG_WD_DEVICE_ID`); host `WD_DEVICE` — **not** MAC suffix in v1 (Step 8c).
+3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
+4. Step 10 path: **B-http vs early L1** — decide at Step 10 go (W14).

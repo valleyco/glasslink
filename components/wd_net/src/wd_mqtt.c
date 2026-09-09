@@ -25,33 +25,41 @@ static volatile bool s_connected;
 
 static void publish_status(void)
 {
-    char body[192];
+    char body[256];
     snprintf(body, sizeof(body),
-             "{\"fw\":\"wl-display\",\"disp\":{\"w\":320,\"h\":240},"
+             "{\"fw\":\"wl-display\",\"device_id\":\"%s\","
+             "\"disp\":{\"w\":320,\"h\":240},"
              "\"inline_max\":%d,\"codecs\":[\"raw_rgb565\",\"delta_rle_v1\"]}",
-             s_inline_max);
+             s_device, s_inline_max);
     esp_mqtt_client_publish(s_client, s_topic_status, body, 0, 1, 1);
 }
 
-static void publish_ack(int rc, int n)
+static void publish_ack(int rc, int n, unsigned id, unsigned seq)
 {
-    char body[48];
-    snprintf(body, sizeof(body), "{\"rc\":%d,\"n\":%d}", rc, n);
+    char body[96];
+    snprintf(body, sizeof(body), "{\"rc\":%d,\"n\":%d,\"id\":%u,\"seq\":%u}", rc, n, id,
+             seq);
     esp_mqtt_client_publish(s_client, s_topic_ack, body, 0, 0, 0);
 }
 
 static void handle_cmd(const uint8_t *data, int len)
 {
     int rc;
+    unsigned id = 0;
+    unsigned seq = 0;
     if (!data || len <= 0) {
         return;
     }
-    ESP_LOGI(TAG, "cmd %d bytes", len);
+    if (len >= 12) {
+        id = (unsigned)data[8] | ((unsigned)data[9] << 8);
+        seq = (unsigned)data[10] | ((unsigned)data[11] << 8);
+    }
+    ESP_LOGI(TAG, "cmd %d bytes id=%u seq=%u", len, id, seq);
     rc = contract_dispatch(data, (size_t)len);
     if (rc != CONTRACT_OK) {
         ESP_LOGW(TAG, "dispatch rc=%d", rc);
     }
-    publish_ack(rc, len);
+    publish_ack(rc, len, id, seq);
 }
 
 static void mqtt_event(void *args, esp_event_base_t base, int32_t event_id,

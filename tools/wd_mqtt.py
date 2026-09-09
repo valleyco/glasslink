@@ -18,6 +18,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import struct
 import subprocess
@@ -227,6 +228,13 @@ def check_inline_max(msg: bytes, *, enforce: bool) -> None:
         print(f"warn: {msg_txt}", file=sys.stderr)
 
 
+def peek_id_seq(payload: bytes) -> tuple[int, int]:
+    if len(payload) < 12:
+        return 0, 0
+    id_, seq = struct.unpack_from("<HH", payload, 8)
+    return int(id_), int(seq)
+
+
 def cmd_inject(args: argparse.Namespace) -> int:
     try:
         if args.subcmd == "clear":
@@ -252,11 +260,57 @@ def cmd_inject(args: argparse.Namespace) -> int:
 
     if args.publish or not args.out:
         c = mqtt_client(args.host, args.port, f"wd-inject-{os.getpid()}")
+        c.loop_start()
         t = topic_cmd(args.device)
+        ack_topic = topic_ack(args.device)
+        want_id, want_seq = peek_id_seq(payload)
+        ack_holder: dict[str, object] = {}
+
+        if getattr(args, "wait_ack", False):
+            done = threading.Event()
+
+            def on_message(client, userdata, msg):  # noqa: ARG001
+                if msg.topic != ack_topic:
+                    return
+                try:
+                    body = json.loads(msg.payload.decode())
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    return
+                if int(body.get("seq", -1)) != want_seq:
+                    return
+                if int(body.get("id", -1)) != want_id:
+                    return
+                ack_holder["body"] = body
+                done.set()
+
+            c.on_message = on_message
+            c.subscribe(ack_topic, qos=0)
+            time.sleep(0.05)
+
         info = c.publish(t, payload, qos=1, retain=False)
         info.wait_for_publish(timeout=5)
-        c.disconnect()
+        if not info.is_published():
+            c.loop_stop()
+            c.disconnect()
+            print("publish timeout", file=sys.stderr)
+            return 1
         print(f"published {len(payload)} B → {t} @ {args.host}:{args.port}")
+
+        if getattr(args, "wait_ack", False):
+            if not done.wait(timeout=getattr(args, "ack_timeout", 5.0)):
+                c.loop_stop()
+                c.disconnect()
+                print("ack timeout", file=sys.stderr)
+                return 1
+            body = ack_holder.get("body") or {}
+            print(f"ack {body}")
+            if int(body.get("rc", -1)) != 0:
+                c.loop_stop()
+                c.disconnect()
+                return 1
+
+        c.loop_stop()
+        c.disconnect()
     return 0
 
 
@@ -287,9 +341,12 @@ def cmd_visual(args: argparse.Namespace) -> int:
         try:
             write_framed(proc, msg.payload)
             print(f"<< {msg.topic} {len(msg.payload)}B → sim")
+            id_, seq = peek_id_seq(msg.payload)
             client.publish(
                 topic_ack(args.device),
-                f'{{"rc":0,"n":{len(msg.payload)}}}'.encode(),
+                json.dumps(
+                    {"rc": 0, "n": len(msg.payload), "id": id_, "seq": seq}
+                ).encode(),
                 qos=0,
                 retain=False,
             )
@@ -542,6 +599,17 @@ def build_parser() -> argparse.ArgumentParser:
             "--publish",
             action="store_true",
             help="force publish when --out set",
+        )
+        ap.add_argument(
+            "--wait-ack",
+            action="store_true",
+            help="wait for wd/{device}/ack matching id+seq",
+        )
+        ap.add_argument(
+            "--ack-timeout",
+            type=float,
+            default=5.0,
+            help="seconds to wait when --wait-ack",
         )
 
     c = isub.add_parser("clear")

@@ -51,9 +51,11 @@ Manual:
 
 ## Device (CYD)
 
+Device id is a **configured name** (NVS key `device_id` / `CONFIG_WD_DEVICE_ID`, e.g. `cyd1`) — not derived from MAC. Host tools use `--device` or env `WD_DEVICE`. Topics: [`docs/contract/topics-v1.md`](docs/contract/topics-v1.md).
+
 ```bash
 # ESP-IDF env sourced (e.g. source ~/Projects/esp-idf/export.sh)
-cp tools/nvs.example.csv tools/nvs.csv   # edit Wi-Fi + mqtt://<LAN-IP>:1883
+cp tools/nvs.example.csv tools/nvs.csv   # edit Wi-Fi + mqtt://<LAN-IP>:1883 + device_id
 make build-mqtt
 make flash-mqtt
 make flash-nvs                           # credentials → NVS (not EEPROM)
@@ -62,6 +64,8 @@ make flash-nvs                           # credentials → NVS (not EEPROM)
 Glass should show a blue boot bar, then green when MQTT is up. Inject:
 
 ```bash
+./tools/wd_mqtt.py inject clear --device cyd1 --color 0x001F
+./tools/wd_mqtt.py inject clear --device cyd1 --color 0x001F --wait-ack
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0xF800
 ./tools/wd_mqtt.py inject rect --device cyd1 --enc auto --solid 0x07E0 --w 48 --h 32 --x 20 --y 40
 ```
@@ -96,7 +100,7 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 | ID | Area | Notes |
 |----|------|-------|
-| B-demo-text | `tools/wd_demo.py` banners | Host-drawn banner/title text (Pillow `ImageFont.load_default`) is hard to read on 320×240. Tracked under **Step 8a**. |
+| — | — | None open for Step 8 polish (B-demo-text fixed via `tools/wd_text.py`). |
 
 ---
 

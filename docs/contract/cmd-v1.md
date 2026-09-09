@@ -75,3 +75,5 @@ size_t contract_pack_rect(...);
 ```
 
 See `components/contract/include/contract.h`.
+
+MQTT topics (`cmd` / `ack` / `status` / `lwt`): [`topics-v1.md`](topics-v1.md).

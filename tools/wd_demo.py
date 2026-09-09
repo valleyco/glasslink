@@ -46,6 +46,7 @@ except ImportError:
 # Import pack/publish helpers from sibling module
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wd_mqtt as wm  # noqa: E402
+import wd_text as wt  # noqa: E402
 
 PANEL_W, PANEL_H = 320, 240
 INLINE_PAYLOAD = wm.INLINE_MAX - wm.HDR_SIZE
@@ -124,17 +125,7 @@ def load_asset(asset: dict, skip_download: bool) -> tuple[int, int, bytes]:
 
 
 def make_banner(text: str, w: int = 320, h: int = 28, bg=(0, 40, 80), fg=(255, 220, 80)) -> bytes:
-    img = Image.new("RGB", (w, h), bg)
-    # tiny 5x7-ish bitmap font via default PIL if available — draw bars + PIL default
-    try:
-        from PIL import ImageDraw, ImageFont
-
-        draw = ImageDraw.Draw(img)
-        font = ImageFont.load_default()
-        draw.text((8, 8), text, fill=fg, font=font)
-    except Exception:
-        pass
-    return image_to_rgb565(img)
+    return image_to_rgb565(wt.draw_banner_rgb(text, w, h, bg=bg, fg=fg))
 
 
 def encode_auto(w: int, h: int, raw: bytes) -> tuple[int, bytes]:

@@ -4,7 +4,7 @@ IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
 .PHONY: test test-render test-codec test-contract bench-codec mqtt-loopback \
-	sim sim-mqtt demo demo-sim clean \
+	sim sim-mqtt demo demo-fetch demo-sim clean \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
