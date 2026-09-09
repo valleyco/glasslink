@@ -24,6 +24,7 @@ host/contract/test_contract_apply
 # Secrets / local NVS (never commit)
 tools/nvs.csv
 tools/nvs.bin
+tools/.cache/
 *.local
 credentials.env
 sdkconfig.local

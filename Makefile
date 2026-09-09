@@ -4,7 +4,7 @@ IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
 .PHONY: test test-render test-codec test-contract bench-codec mqtt-loopback \
-	sim sim-mqtt clean \
+	sim sim-mqtt demo demo-sim clean \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
@@ -36,6 +36,19 @@ sim-mqtt:
 	$(MAKE) -C host/sim all
 	$(MAKE) -C host/mqtt all
 	tools/.venv/bin/python tools/wd_mqtt.py visual --device sim1
+
+# Demo: cache originals (JPEG); convert RGB565 only at play time
+demo-fetch:
+	tools/.venv/bin/python tools/wd_demo.py fetch
+
+demo:
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_demo.py --device $${WD_DEVICE:-cyd1}
+
+demo-sim:
+	$(MAKE) -C host/sim all
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_demo.py --device sim1 --visual
 
 build: build-esp32
 

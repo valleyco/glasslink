@@ -1,4 +1,5 @@
-# Host MQTT tools (tools/wd_mqtt.py).
+# Host MQTT / demo tools (tools/wd_mqtt.py, tools/wd_demo.py).
 #   python3 -m venv tools/.venv
 #   tools/.venv/bin/pip install -r tools/requirements.txt
 paho-mqtt==2.1.0
+Pillow>=10
