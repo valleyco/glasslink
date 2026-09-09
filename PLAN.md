@@ -112,12 +112,15 @@ No production feature lands without a failing host test written first (except pu
 | **W10** | TLS day one | **No** — LAN trusted network only until rect path works. | **agreed** |
 | **W11** | Broker / buffers | LAN Mosquitto OK. **Raise esp-mqtt buffer** (e.g. 8 KiB); `inline_max` < buffer. Never retain rasters. | **agreed** |
 | **W13** | HAL test seam | **Shared `hal_display.h` + two `.c` backends** (link-time choice). Not vtable/function-pointer inject. | **agreed** |
+| **W14** | Post-v1 order | **A → D → (B or C):** (A) product polish, (D) thin Python scene/host composer, then either **B-http** (bigger pictures) or **L1 start** (fill/text + later binds) — pick at Step 10. No codec-v2 / LVGL until scheduled. | **agreed** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–7 done**. `delta_rle_v1` frozen; host `codec_encode_auto` (raw if no gain). Product path complete for v1 L0+MQTT; backlog is B-* / L1.
+Steps **0–7 done** (v1 L0+MQTT). Post-v1 locked as **W14**.  
+**Next:** Step **8** (polish) → Step **9** (thin scene host) → Step **10** (B-http **or** L1).  
+Step 8 **in progress**.
 
 ---
 
@@ -287,11 +290,51 @@ Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB56
 
 ---
 
+### Step 8 — Product polish (theme A)
+**Status:** `in progress` · **Depends on:** Steps 0–7 · **Decision:** W14  
+Make demos and day-to-day MQTT use trustworthy. Still L0-only on device.
+
+#### Step 8a — Readable host demo text
+**Status:** `todo`  
+Fix **B-demo-text**: replace Pillow `load_default` banners with a readable embedded bitmap (or TTF) font → RGB565 L0 rects. No device font / L1 yet.
+
+#### Step 8b — Ack / status / LWT hygiene
+**Status:** `todo`  
+Device already publishes `wd/{id}/ack|status|lwt`. Harden: ack includes `seq`/`id`/`rc`; status includes `device_id` + `inline_max`; document topics; host inject/demo can optionally wait for ack. Rely on esp-mqtt auto-reconnect; republish online+status on `CONNECTED` (already).
+
+#### Step 8c — Device-id story
+**Status:** `todo`  
+**Freeze:** configured name via NVS/`CONFIG_WD_DEVICE_ID` (e.g. `cyd1`) — **not** MAC suffix for v1. Document in README + open questions closed. Env `WD_DEVICE` for host tools.
+
+**Done when:** B-demo-text resolved or closed; topic/ack contract noted in docs; device-id decision written; host can observe ack on inject.
+
+---
+
+### Step 9 — Thin scene host (theme D)
+**Status:** `todo` · **Depends on:** Step 8  
+Python composer: dirty rects / scene steps, auto encode (`codec_encode_auto` / CLI), multi-device publish. Device stays dumb L0. Builds on `wd_demo.py` / `wd_mqtt.py` — not a full UI toolkit.
+
+**Done when:** `tools/` can drive a multi-rect “scene” from a small script/YAML without hand-packing each inject; documented in README.
+
+---
+
+### Step 10 — Bigger pictures **or** useful UI (theme B **or** C)
+**Status:** `discuss` · **Depends on:** Step 9 · **Pick one at go time**
+
+| Path | Backlog | Sketch |
+|------|---------|--------|
+| **B** | B-http | MQTT cmd with `uri` flag; device HTTP GET → decode strip → blit; heap/timeout policy on no-PSRAM |
+| **C** | B1 / early L1 | Tiny L1: `fill_rect` + text (host-rasterized glyphs preferred first, or device bitmap font); value binds (**B2**) later |
+
+Do **not** start both in parallel. Codec v2 / LVGL stay backlog.
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
 |----|------|
-| B1 | L1 draw.batch + groups |
+| B1 | L1 draw.batch + groups (earliest slice may land in Step 10-C) |
 | B2 | MQTT value binds → text slots |
 | B3 | TLS / credentials story (**W10**) |
 | B4 | Touch events upward (reuse invaders touch later) |
@@ -300,9 +343,10 @@ Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB56
 | B7 | Shared HAL component repo (if copy drifts) |
 | B8 | OTA |
 | B9 | Home Assistant discovery flavor |
-| B-http | HTTP `uri` pull when inline_max insufficient (W7 phase 2) |
+| B-http | HTTP `uri` pull when inline_max insufficient (W7 phase 2) — candidate Step 10-B |
 | B-cbor | CBOR/generic envelope when L1/bind need it (replace or sit beside binary) |
 | B-s3 | Build/verify profile #2 (S3+PSRAM) when hardware appears |
+| B-demo-text | Demo banner font (tracked in Step 8a) |
 
 ---
 

@@ -96,7 +96,7 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 | ID | Area | Notes |
 |----|------|-------|
-| B-demo-text | `tools/wd_demo.py` banners | Host-drawn banner/title text (Pillow `ImageFont.load_default`) is hard to read / poorly sized on the 320×240 panel. Demo images and solid rects are fine; fix later (truetype font or bitmap glyphs), not blocking L0 path. |
+| B-demo-text | `tools/wd_demo.py` banners | Host-drawn banner/title text (Pillow `ImageFont.load_default`) is hard to read on 320×240. Tracked under **Step 8a**. |
 
 ---
 
