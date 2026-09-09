@@ -20,6 +20,13 @@ host/render/test_render_basic
 host/contract/test_contract_parse
 host/contract/test_contract_apply
 
+# Secrets / local NVS (never commit)
+tools/nvs.csv
+tools/nvs.bin
+*.local
+credentials.env
+sdkconfig.local
+
 # Tools
 tools/.venv/
 __pycache__/

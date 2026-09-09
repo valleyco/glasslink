@@ -117,7 +117,7 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–5 + 6h + 6s done**. Host path includes SDL CYD sim (`make sim` / `make sim-mqtt`). **Next: Step 6d** glass flash (SSID/broker) or **Step 7** codec freeze.
+Steps **0–6d done** (host path + SDL sim + glass MQTT E2E with NVS creds). **Next: Step 7** — codec tune/freeze.
 
 ---
 
@@ -265,12 +265,14 @@ Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB56
 **Done when:** demo + MQTT visual path work on Linux (`libsdl2-dev`). ✓
 
 #### Step 6d — Device glass E2E
-**Status:** `todo` · **Depends on:** Step 6h (preferred) + Steps 4–5; 6s recommended  
-- Flash `MQTT_MAIN=1` with real SSID / broker URI
-- Same inject tools against CYD; heap notes after Wi‑Fi+MQTT
+**Status:** `done` (2026-09-09) · **Depends on:** Step 6h + 4–5  
+- Flash: `make build-mqtt && make flash-mqtt` then `make flash-nvs` (secrets in gitignored `tools/nvs.csv`)
+- NVS namespace `wd` via `wd_cfg_*` / `wd_net_start` in `components/wd_net`
+- Eyeball OK: blue clear + red rect via MQTT inject
+- Boot heap band: ~145 KiB DRAM free at init
 - **Still no HTTP** → B-http if inline forced
 
-**Done when:** LAN dirty rects reliable on glass; heap noted.
+**Done when:** LAN dirty rects reliable on glass; heap noted. ✓
 
 ---
 
@@ -351,6 +353,6 @@ make build flash monitor   # IDF device (later)
 
 ## Open questions (short list)
 
-1. Dev Wi-Fi/MQTT credentials: compile-time vs NVS provisioning.
+1. Dev Wi-Fi/MQTT credentials: **NVS namespace `wd`** (agreed 2026-09-09) — load first; seed from Kconfig once; `make flash-nvs` for CSV provision. Secrets never in git.
 2. Device id: MAC suffix vs configured name.
 3. Exact binary header layout (settle in Step 3 with tests) — magic/`ver`/`type`/`id`/geom/`enc`/`len`.

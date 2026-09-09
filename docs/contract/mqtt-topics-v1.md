@@ -60,4 +60,15 @@ make sim-mqtt
 ./tools/wd_mqtt.py inject rect --device sim1 --pattern checker --enc delta --w 32 --h 24 --x 40 --y 40
 ```
 
-Device firmware (`components/net`) uses the same topics once Wi-Fi is configured (Step 6d).
+Device firmware (`components/wd_net`) uses the same topics once provisioned.
+
+### Credentials (NVS, not EEPROM)
+
+ESP32 stores config in **NVS** flash (namespace `wd`). Do not commit secrets.
+
+```bash
+cp tools/nvs.example.csv tools/nvs.csv   # edit SSID/pass/broker
+# IDF env active:
+make flash-nvs                           # writes NVS @ 0x9000
+make build-mqtt && make flash-mqtt       # app (seeds NVS from Kconfig if empty)
+```

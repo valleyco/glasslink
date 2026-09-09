@@ -1,0 +1,5 @@
+key,type,encoding,value
+wifi_ssid,data,string,YOUR_SSID
+wifi_pass,data,string,YOUR_PASSWORD
+mqtt_uri,data,string,mqtt://192.168.0.216:1883
+device_id,data,string,cyd1
