@@ -1,0 +1,25 @@
+# IDF
+build/
+build-esp32/
+build-esp32-*/
+sdkconfig
+sdkconfig.old
+sdkconfig.esp32
+sdkconfig.*.old
+managed_components/
+dependencies.lock
+
+# Host binaries (keep sources)
+host/mqtt/apply_bin
+host/mqtt/encode_rect
+host/codec/bench_codec
+host/codec/test_codec_raw
+host/codec/test_codec_delta_rle
+host/render/test_render_basic
+host/contract/test_contract_parse
+host/contract/test_contract_apply
+
+# Tools
+tools/.venv/
+__pycache__/
+*.pyc

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "description": "Synthetic corpus core set for make bench-codec (host generators, no blobs).",
+  "generator": "host/codec/gen/corpus_gen.c",
+  "cases": [
+    {"id": "solid_32", "class": "solid", "w": 32, "h": 32, "seed": 1},
+    {"id": "solid_320x240", "class": "solid", "w": 320, "h": 240, "seed": 1},
+    {"id": "h_runs_64", "class": "h_runs", "w": 64, "h": 48, "seed": 1},
+    {"id": "v_runs_64", "class": "v_runs", "w": 64, "h": 48, "seed": 1},
+    {"id": "grid_32", "class": "grid", "w": 32, "h": 32, "seed": 1},
+    {"id": "grid_128", "class": "grid", "w": 128, "h": 128, "seed": 1},
+    {"id": "grad_h_64", "class": "gradient_h", "w": 64, "h": 48, "seed": 1},
+    {"id": "grad_v_64", "class": "gradient_v", "w": 64, "h": 48, "seed": 1},
+    {"id": "grad_2d_64", "class": "gradient_2d", "w": 64, "h": 48, "seed": 1},
+    {"id": "ui_panel_128", "class": "ui_panel", "w": 128, "h": 128, "seed": 1},
+    {"id": "ui_panel_320x240", "class": "ui_panel", "w": 320, "h": 240, "seed": 1},
+    {"id": "ui_text_128", "class": "ui_text", "w": 128, "h": 64, "seed": 1},
+    {"id": "ui_gauge_96", "class": "ui_gauge", "w": 96, "h": 96, "seed": 1},
+    {"id": "sparse_64", "class": "sparse_dirty", "w": 64, "h": 64, "seed": 1},
+    {"id": "sparse_320x240", "class": "sparse_dirty", "w": 320, "h": 240, "seed": 1},
+    {"id": "noise_32", "class": "noise_white", "w": 32, "h": 32, "seed": 42},
+    {"id": "noise_64", "class": "noise_white", "w": 64, "h": 48, "seed": 42},
+    {"id": "noise_1bit_64", "class": "noise_1bit", "w": 64, "h": 48, "seed": 7},
+    {"id": "photo_soft_64", "class": "photo_soft", "w": 64, "h": 48, "seed": 9},
+    {"id": "partial_tl_32", "class": "partial_tl", "w": 32, "h": 32, "seed": 1},
+    {"id": "partial_br_32", "class": "partial_br", "w": 32, "h": 32, "seed": 1},
+    {"id": "adv_rle_32", "class": "adversarial_rle", "w": 32, "h": 32, "seed": 1},
+    {"id": "odd_319x1", "class": "gradient_h", "w": 319, "h": 1, "seed": 1},
+    {"id": "odd_1x240", "class": "gradient_v", "w": 1, "h": 240, "seed": 1},
+    {"id": "odd_3x5", "class": "grid", "w": 3, "h": 5, "seed": 1},
+    {"id": "odd_8x8", "class": "ui_text", "w": 8, "h": 8, "seed": 1}
+  ]
+}

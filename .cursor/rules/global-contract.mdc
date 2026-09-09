@@ -1,0 +1,73 @@
+---
+description: esp32-wl-display global contract — PLAN steps, TDD, layer boundaries, v1 scope
+alwaysApply: true
+---
+
+# Global development rules
+
+Expert assistant for **esp32-wl-display**: wireless thin-client display on ESP32 CYD (MQTT control, L0 raster, host-first TDD).
+
+## Read first
+
+1. `PLAN.md` (decisions W1–W13, steps, status)
+2. `goal.md` (product intent)
+3. `docs/architecture-draft.md` and research briefs when relevant
+
+## Process
+
+- **Interactive steps:** Do not start a PLAN step until the user agrees (`go` / `/step-go`). Update step status in `PLAN.md` when done.
+- **One commit per completed step** — only when the user asks to commit (`/commit`).
+- **TDD (W12):** Red host tests first for `codec`, `contract`, `render`. `make test` (or suite target) must be green before claiming a logic step done.
+- **Host before device:** Pure logic green on gcc; IDF/SPI/Wi-Fi/MQTT are thin adapters afterward.
+- **No root without ask:** Never `sudo`/`su` unless the user approves that specific command.
+- **Ask before side effects:** Do not flash, monitor, install packages, or run long IDF builds unless the user asked or confirmed for that run. Propose the exact command when unclear.
+
+## User interaction
+
+- Do not assume hardware, credentials, or intent to implement from a casual question — discuss tradeoffs first.
+- Implement only when clearly asked (`go`, `do it`, `add …`, `/step-go`).
+- Suggestions → outline pros/cons → wait for explicit go.
+
+## v1 scope lock (do not expand without `/plan-decide`)
+
+| In | Out (v1) |
+|----|----------|
+| L0 raster + `display.clear` | L1 draw ops, L2/LVGL, touch |
+| Custom **binary** cmd header | CBOR/JSON on device |
+| MQTT **inline** payloads | HTTP `uri` pull, MQTT chunking |
+| `raw_rgb565` + `delta_rle_v1` | PNG live path; mandatory Huffman/YUV |
+| Host TDD + fake_display | Full RGB565 FB on primary CYD |
+| ESP-IDF + esp-mqtt | Arduino/PlatformIO as primary |
+| LAN, no TLS day one | TLS-required deployment |
+
+HTTP URI, CBOR, S3+PSRAM FB path, touch: backlog only (`B-http`, `B-cbor`, `B-s3`, …).
+
+## Layer boundaries
+
+| Piece | Owns | Must not |
+|-------|------|----------|
+| `codec` | encode/decode, bitstreams | IDF, MQTT, SPI |
+| `contract` | binary envelope parse/dispatch | IDF, network I/O |
+| `render` | clear/rect → `hal_display` ops | codec wire format details beyond pixels |
+| `hal_display` | panel blit API | two backends: host fake + ESP SPI (link-time; **no vtable**) |
+| `net` / `main` | Wi-Fi, MQTT, wiring | Grow protocol logic that belongs in contract/codec |
+
+Host tests never link IDF. No IDF headers inside `codec` / `contract` / `render`.
+
+## Hardware / profiles
+
+- **Primary:** ESP32-2432S028R CYD V3 — ST7789 320×240, no PSRAM (see invaders board manual when copied).
+- **Profile #2:** S3+PSRAM — document only until hardware; same contract.
+- ST7789 ≠ ILI9341 on this unit; RGB565 TX byteswap; BL GPIO21.
+
+## Compression
+
+- `raw_rgb565` is required baseline.
+- `delta_rle_v1` is a **measured spike** (goal.md); keep only if benches justify; `enc` enum allows alternatives (QOI/JPEG later).
+
+## When stuck
+
+- Decisions and step order: `PLAN.md`
+- Codecs: `docs/research-codecs.md`
+- MQTT patterns: `docs/research-mqtt.md`
+- HAL reference: `../esp32-invaders` (display-only copy — no 8080/machine)

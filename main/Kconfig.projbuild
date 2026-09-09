@@ -1,0 +1,19 @@
+menu "wl-display"
+
+config WD_WIFI_SSID
+    string "WiFi SSID"
+    default "CHANGE_ME"
+
+config WD_WIFI_PASS
+    string "WiFi password"
+    default "CHANGE_ME"
+
+config WD_MQTT_URI
+    string "MQTT broker URI"
+    default "mqtt://192.168.1.1:1883"
+
+config WD_DEVICE_ID
+    string "Device id (wd/{id}/...)"
+    default "cyd1"
+
+endmenu
