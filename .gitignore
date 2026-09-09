@@ -12,6 +12,7 @@ dependencies.lock
 # Host binaries (keep sources)
 host/mqtt/apply_bin
 host/mqtt/encode_rect
+host/sim/wd-sim
 host/codec/bench_codec
 host/codec/test_codec_raw
 host/codec/test_codec_delta_rle

@@ -117,7 +117,7 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–5 host path done**. Local Mosquitto `127.0.0.1:1883` used for loopback. Device MQTT firmware builds (`MQTT_MAIN=1`); **flash E2E pending**.
+Steps **0–5 + 6h + 6s done**. Host path includes SDL CYD sim (`make sim` / `make sim-mqtt`). **Next: Step 6d** glass flash (SSID/broker) or **Step 7** codec freeze.
 
 ---
 
@@ -236,19 +236,49 @@ make test-contract   # 32 parse + 52 apply asserts
 
 ---
 
-### Step 6 — L0 E2E + host inject tools
-**Status:** `in progress` (inject tool exists; device flash E2E open) · **Depends on:** Steps 2–5  
-- Tool: `wd_mqtt.py inject` (raw + delta via `encode_rect`) ✓ host
-- Device path on glass; heap notes
-- **Still no HTTP** unless rects force it → then backlog B-http
+### Step 6 — L0 E2E + host inject tools (split host / device)
 
-**Done when:** LAN dirty rects reliable; heap noted.
+Rationale (2026-09-09): finish everything host-provable before flash. Wi‑Fi/SPI are the unknowns; broker→contract→pixels is not.
+
+#### Step 6h — Host MQTT L0 complete (no flash)
+**Status:** `done` (2026-09-09) · **Depends on:** Steps 2–5  
+
+| Deliverable | Notes |
+|-------------|--------|
+| Loopback: clear + **raw rect** + **delta rect** + checker | Broker → `apply_bin` → fake_display pixel expects ✓ |
+| URI flag reject + `inline_max` inject guard | W7 / mqtt-topics ✓ |
+| Inject: `--pattern` / `--rgb-file` / `--payload-file` | encode via `encode_rect` ✓ |
+| `make mqtt-loopback` green | gate for host MQTT path ✓ |
+
+**Done when:** host can exercise the full L0 cmd path over MQTT without a device. ✓
+
+#### Step 6s — Host CYD SDL simulator (visible)
+**Status:** `done` (2026-09-09) · **Depends on:** Steps 1, 3, 6h  
+Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB565 (scale 2). Same contract/codec/render path — no IDF, no touch.
+
+| Mode | What |
+|------|------|
+| `make sim` / `--demo` | Scripted clear + raw/delta/bars ✓ |
+| `--apply file.bin…` | Replay packed envelopes ✓ |
+| `make sim-mqtt` / `wd_mqtt.py visual` | MQTT → stdin framing → window ✓ |
+
+**Done when:** demo + MQTT visual path work on Linux (`libsdl2-dev`). ✓
+
+#### Step 6d — Device glass E2E
+**Status:** `todo` · **Depends on:** Step 6h (preferred) + Steps 4–5; 6s recommended  
+- Flash `MQTT_MAIN=1` with real SSID / broker URI
+- Same inject tools against CYD; heap notes after Wi‑Fi+MQTT
+- **Still no HTTP** → B-http if inline forced
+
+**Done when:** LAN dirty rects reliable on glass; heap noted.
 
 ---
 
 ### Step 7 — Compression tune, compare, freeze v1
-**Status:** `todo` · **Depends on:** Step 2a–2b  
+**Status:** `todo` · **Depends on:** Step 2a–2b (host-only; **not** required for 6h)  
 See [`docs/codec-harness.md`](docs/codec-harness.md) + [`docs/research-codecs.md`](docs/research-codecs.md).
+
+**Ordering note:** Can run after 6h without hardware. Prefer a first glass smoke with **raw** (6d) before a long sweep if the goal is “does Wi‑Fi+SPI work?”; freeze bitstreams before relying on delta on-device.
 
 - Knob sweeps (predict order, RLE style, planes/YUV experiments)
 - Compare: raw, plain RLE, delta_rle profiles, mini-qoi, optional JPEG full-frame

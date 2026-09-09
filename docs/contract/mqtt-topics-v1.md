@@ -22,16 +22,42 @@ Never retain rasters. URI/HTTP not in v1.
 
 ## Host tools
 
+Needs a local venv with paho-mqtt:
+
+```bash
+python3 -m venv tools/.venv
+tools/.venv/bin/pip install -r tools/requirements.txt
+```
+
 ```bash
 # one-shot against local broker + fake_display apply
+# covers: clear, raw rect, delta rect, delta checker, URI reject, inline_max guard
 make mqtt-loopback
 
 # inject
 ./tools/wd_mqtt.py inject clear --device dev1 --color 0xF800
 ./tools/wd_mqtt.py inject rect --device dev1 --x 10 --y 10 --w 16 --h 16 --solid 0x07E0
+./tools/wd_mqtt.py inject rect --device dev1 --pattern checker --enc delta --w 16 --h 8
+./tools/wd_mqtt.py inject rect --device dev1 --rgb-file pixels.rgb --w 8 --h 8 --enc raw --out cmd.bin
 
 # long-running host simulator (no device flash)
 ./tools/wd_mqtt.py sim --device dev1
 ```
 
-Device firmware (`components/net`) uses the same topics once Wi-Fi is configured (Step 5 flash E2E).
+`inline_max` = **6144**; inject refuses oversized envelopes.
+
+### Visible host CYD sim (Step 6s)
+
+```bash
+# scripted clear / raw / delta / bars in an SDL window
+make sim
+# keys: space=pause  n=step  q=quit
+
+# live MQTT → same window
+make sim-mqtt
+# other terminal:
+./tools/wd_mqtt.py inject clear --device sim1 --color 0xF800
+./tools/wd_mqtt.py inject rect --device sim1 --pattern checker --enc delta --w 32 --h 24 --x 40 --y 40
+```
+
+Device firmware (`components/net`) uses the same topics once Wi-Fi is configured (Step 6d).
