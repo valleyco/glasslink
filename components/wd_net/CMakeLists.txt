@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "src/wd_mqtt.c" "src/wd_config.c" "src/wd_net.c"
+    SRCS "src/wd_mqtt.c" "src/wd_config.c" "src/wd_net.c" "src/wd_http.c"
     INCLUDE_DIRS "include"
-    REQUIRES mqtt contract esp_event nvs_flash esp_wifi esp_netif
+    REQUIRES mqtt contract esp_event nvs_flash esp_wifi esp_netif esp_http_client
 )

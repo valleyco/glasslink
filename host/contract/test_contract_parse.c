@@ -1,4 +1,5 @@
 #include "contract.h"
+#include "codec.h"
 #include "test_assert.h"
 
 #include <stdint.h>
@@ -45,13 +46,40 @@ static void test_bad_type(void)
     ASSERT_EQ_INT(CONTRACT_ERR_TYPE, contract_parse(buf, n, &m));
 }
 
-static void test_uri_flag_rejected(void)
+static void test_uri_flag_on_clear_rejected(void)
 {
     uint8_t buf[64];
     contract_msg_t m;
     size_t n = contract_pack_clear(buf, sizeof(buf), 0, 0, 0);
     buf[6] = CONTRACT_FLAG_URI;
     ASSERT_EQ_INT(CONTRACT_ERR_FLAGS, contract_parse(buf, n, &m));
+}
+
+static void test_unknown_flag_rejected(void)
+{
+    uint8_t buf[64];
+    contract_msg_t m;
+    size_t n = contract_pack_clear(buf, sizeof(buf), 0, 0, 0);
+    buf[6] = 0x02; /* reserved bit */
+    ASSERT_EQ_INT(CONTRACT_ERR_FLAGS, contract_parse(buf, n, &m));
+}
+
+static void test_parse_uri_rect(void)
+{
+    const char *url = "http://192.168.0.1:8000/a.bin";
+    uint8_t buf[128];
+    contract_msg_t m;
+    size_t n = contract_pack_rect_flags(
+        buf, sizeof(buf), 1, 2, 10, 20, 8, 8, CODEC_ENC_DELTA_RLE_V1,
+        CONTRACT_FLAG_URI, (const uint8_t *)url, (uint32_t)strlen(url));
+    ASSERT_TRUE(n == CONTRACT_HDR_SIZE + strlen(url));
+    ASSERT_EQ_INT(CONTRACT_OK, contract_parse(buf, n, &m));
+    ASSERT_EQ_INT(CONTRACT_FLAG_URI, m.flags);
+    ASSERT_EQ_INT((int)strlen(url), (int)m.payload_len);
+    ASSERT_TRUE(memcmp(m.payload, url, strlen(url)) == 0);
+    /* URI path does not require payload_len == w*h*2 */
+    ASSERT_EQ_INT(8, m.w);
+    ASSERT_EQ_INT(8, m.h);
 }
 
 static void test_trunc_header(void)
@@ -145,7 +173,9 @@ int main(void)
     test_bad_magic();
     test_bad_ver();
     test_bad_type();
-    test_uri_flag_rejected();
+    test_uri_flag_on_clear_rejected();
+    test_unknown_flag_rejected();
+    test_parse_uri_rect();
     test_trunc_header();
     test_trunc_payload();
     test_raw_len_mismatch();

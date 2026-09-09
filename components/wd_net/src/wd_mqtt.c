@@ -8,6 +8,7 @@
 #include "contract.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
+#include "wd_http.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -25,12 +26,13 @@ static volatile bool s_connected;
 
 static void publish_status(void)
 {
-    char body[256];
+    char body[320];
     snprintf(body, sizeof(body),
              "{\"fw\":\"wl-display\",\"device_id\":\"%s\","
              "\"disp\":{\"w\":320,\"h\":240},"
-             "\"inline_max\":%d,\"codecs\":[\"raw_rgb565\",\"delta_rle_v1\"]}",
-             s_device, s_inline_max);
+             "\"inline_max\":%d,\"http\":true,\"http_max\":%u,"
+             "\"codecs\":[\"raw_rgb565\",\"delta_rle_v1\"]}",
+             s_device, s_inline_max, (unsigned)wd_http_max_body());
     esp_mqtt_client_publish(s_client, s_topic_status, body, 0, 1, 1);
 }
 

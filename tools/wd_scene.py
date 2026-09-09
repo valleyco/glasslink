@@ -259,6 +259,31 @@ def run_scene(scene: dict, args: argparse.Namespace) -> int:
                 y = int(body.get("y", 0))
                 w, h, raw = load_image(path, fit_t)
                 seq = tile_rect(client, devices, cmd_id, seq, x, y, w, h, raw)
+            elif op in ("uri", "uri_rect"):
+                url = str(body["url"])
+                if not url.startswith("http://"):
+                    raise ValueError("uri must be http://")
+                if len(url) > 256:
+                    raise ValueError("uri too long")
+                x = int(body.get("x", 0))
+                y = int(body.get("y", 0))
+                w = int(body["w"])
+                h = int(body["h"])
+                enc_name = str(body.get("enc", "delta"))
+                enc = wm.ENC_RAW if enc_name == "raw" else wm.ENC_DELTA
+                msg = wm.pack_rect(
+                    cmd_id,
+                    seq,
+                    x,
+                    y,
+                    w,
+                    h,
+                    enc,
+                    url.encode("utf-8"),
+                    flags=wm.FLAG_URI,
+                )
+                publish_all(client, devices, msg)
+                seq += 1
             else:
                 raise ValueError(f"unknown op {op!r}")
             time.sleep(float(body.get("pause", pause)))

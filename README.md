@@ -59,6 +59,20 @@ make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
 ./tools/wd_scene.py tools/scenes/hello.yaml --device cyd1
 ```
 
+### HTTP URI (large rects)
+
+Encode → serve on LAN → MQTT carries URL only (`FLAG_URI`):
+
+```bash
+mkdir -p tools/.cache/http
+./tools/wd_mqtt.py asset --w 160 --h 120 --pattern checker --enc auto \
+  --out tools/.cache/http/panel.bin
+# in another terminal (use a directory the device can GET):
+python3 -m http.server 8000 --directory tools/.cache/http
+# edit URL in tools/scenes/http_rect.yaml to this PC's LAN IP, then:
+./tools/wd_scene.py tools/scenes/http_rect.yaml --device cyd1
+```
+
 ---
 
 ## Device (CYD)
@@ -105,8 +119,8 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 ## v1 scope
 
-**In:** L0 raster + clear, binary MQTT inline payloads, `raw_rgb565` + `delta_rle_v1`, host TDD, LAN plaintext MQTT.  
-**Out:** HTTP URI pull, CBOR, touch, TLS, LVGL (see backlog in `PLAN.md`).
+**In:** L0 raster + clear, binary MQTT (inline **and** `FLAG_URI` HTTP pull), `raw_rgb565` + `delta_rle_v1`, host TDD, LAN plaintext MQTT.  
+**Out:** CBOR, touch, TLS, LVGL (see backlog in `PLAN.md`).
 
 ---
 
@@ -114,7 +128,7 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 | ID | Area | Notes |
 |----|------|-------|
-| B-mirror | ST7789 MADCTL | Glass was L–R mirrored vs host intent (invaders-style mirrors-off). Fix: `esp_lcd_panel_mirror(true, false)` in `cyd_display_spi.c` — **needs reflash** to verify. |
+| — | — | B-mirror fixed (`mirror_x`). |
 
 ---
 

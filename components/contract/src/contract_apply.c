@@ -3,10 +3,21 @@
 #include "codec.h"
 #include "render.h"
 
+#include <stdlib.h>
+
 typedef struct {
     int16_t x;
     int16_t y;
 } row_blit_ctx_t;
+
+static contract_fetch_fn s_fetch;
+static void *s_fetch_user;
+
+void contract_set_fetch(contract_fetch_fn fn, void *user)
+{
+    s_fetch = fn;
+    s_fetch_user = user;
+}
 
 static void blit_row_cb(int y, const uint16_t *row, int width, void *user)
 {
@@ -14,11 +25,45 @@ static void blit_row_cb(int y, const uint16_t *row, int width, void *user)
     (void)render_blit_rect((int)c->x, (int)c->y + y, width, 1, row);
 }
 
-int contract_apply(const contract_msg_t *msg)
+static int apply_rect_pixels(const contract_msg_t *msg, const uint8_t *pix,
+                             size_t pix_len)
 {
     row_blit_ctx_t ctx;
     int rc;
 
+    if (msg->w > (uint16_t)CODEC_MAX_WIDTH) {
+        return CONTRACT_ERR_ARG;
+    }
+    if (!pix && pix_len > 0) {
+        return CONTRACT_ERR_ARG;
+    }
+    if (msg->enc == (uint8_t)CODEC_ENC_RAW_RGB565) {
+        uint64_t need = (uint64_t)msg->w * (uint64_t)msg->h * 2ull;
+        if (need != (uint64_t)pix_len) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+    } else if (pix_len == 0) {
+        return CONTRACT_ERR_PAYLOAD;
+    }
+
+    ctx.x = msg->x;
+    ctx.y = msg->y;
+    rc = codec_decode_rows((codec_enc_t)msg->enc, (int)msg->w, (int)msg->h, pix,
+                           pix_len, blit_row_cb, &ctx);
+    if (rc == CODEC_OK) {
+        return CONTRACT_OK;
+    }
+    if (rc == CODEC_ERR_NOSPACE) {
+        return CONTRACT_ERR_NOSPACE;
+    }
+    if (rc == CODEC_ERR_TRUNC) {
+        return CONTRACT_ERR_TRUNC;
+    }
+    return CONTRACT_ERR_PAYLOAD;
+}
+
+int contract_apply(const contract_msg_t *msg)
+{
     if (!msg) {
         return CONTRACT_ERR_ARG;
     }
@@ -28,27 +73,29 @@ int contract_apply(const contract_msg_t *msg)
         return CONTRACT_OK;
 
     case CONTRACT_TYPE_RASTER_RECT:
-        if (msg->w > (uint16_t)CODEC_MAX_WIDTH) {
-            return CONTRACT_ERR_ARG;
+        if (msg->flags & CONTRACT_FLAG_URI) {
+            uint8_t *body = NULL;
+            size_t body_len = 0;
+            int frc;
+            int rc;
+
+            if (!s_fetch) {
+                return CONTRACT_ERR_FETCH;
+            }
+            if (!msg->payload || msg->payload_len == 0) {
+                return CONTRACT_ERR_PAYLOAD;
+            }
+            frc = s_fetch(msg->payload, (size_t)msg->payload_len, &body,
+                          &body_len, s_fetch_user);
+            if (frc != 0 || !body) {
+                free(body);
+                return CONTRACT_ERR_FETCH;
+            }
+            rc = apply_rect_pixels(msg, body, body_len);
+            free(body);
+            return rc;
         }
-        if (!msg->payload && msg->payload_len > 0) {
-            return CONTRACT_ERR_ARG;
-        }
-        ctx.x = msg->x;
-        ctx.y = msg->y;
-        rc = codec_decode_rows((codec_enc_t)msg->enc, (int)msg->w, (int)msg->h,
-                               msg->payload, (size_t)msg->payload_len,
-                               blit_row_cb, &ctx);
-        if (rc == CODEC_OK) {
-            return CONTRACT_OK;
-        }
-        if (rc == CODEC_ERR_NOSPACE) {
-            return CONTRACT_ERR_NOSPACE;
-        }
-        if (rc == CODEC_ERR_TRUNC) {
-            return CONTRACT_ERR_TRUNC;
-        }
-        return CONTRACT_ERR_PAYLOAD;
+        return apply_rect_pixels(msg, msg->payload, (size_t)msg->payload_len);
 
     default:
         return CONTRACT_ERR_TYPE;

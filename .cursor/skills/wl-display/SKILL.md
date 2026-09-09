@@ -19,7 +19,7 @@ Device (ESP-IDF)
 ```
 
 - **Control plane:** MQTT binary commands (inline only in v1).
-- **Bulk HTTP `uri`:** backlog (`B-http`), not first E2E.
+- **Bulk HTTP `uri`:** Step 10-B — `FLAG_URI` + device GET (`http_max` cap)
 - **Display language v1:** L0 rects + clear only.
 
 ## Frozen decisions (see PLAN.md)

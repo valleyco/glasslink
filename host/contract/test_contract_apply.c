@@ -112,6 +112,69 @@ static void test_bad_delta_payload(void)
     }
 }
 
+static uint8_t s_mock_body[64];
+static size_t s_mock_body_len;
+static int s_mock_fetch_rc;
+
+static int mock_fetch(const uint8_t *url, size_t url_len, uint8_t **body_out,
+                      size_t *body_len_out, void *user)
+{
+    (void)user;
+    if (s_mock_fetch_rc != 0) {
+        return s_mock_fetch_rc;
+    }
+    if (url_len < 4 || memcmp(url, "http", 4) != 0) {
+        return -1;
+    }
+    *body_out = (uint8_t *)malloc(s_mock_body_len);
+    if (!*body_out) {
+        return -1;
+    }
+    memcpy(*body_out, s_mock_body, s_mock_body_len);
+    *body_len_out = s_mock_body_len;
+    return 0;
+}
+
+static void test_dispatch_uri_rect(void)
+{
+    uint16_t px[4] = {0x001F, 0x07E0, 0xF800, 0xFFFF};
+    const char *url = "http://host/test.raw";
+    uint8_t msg[128];
+    size_t n;
+
+    memcpy(s_mock_body, px, sizeof(px));
+    s_mock_body_len = sizeof(px);
+    s_mock_fetch_rc = 0;
+    contract_set_fetch(mock_fetch, NULL);
+
+    fake_display_reset();
+    n = contract_pack_rect_flags(
+        msg, sizeof(msg), 9, 1, 10, 20, 2, 2, CODEC_ENC_RAW_RGB565,
+        CONTRACT_FLAG_URI, (const uint8_t *)url, (uint32_t)strlen(url));
+    ASSERT_TRUE(n > 0);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0x001F, fake_display_get_pixel(10, 20));
+    ASSERT_EQ_U16(0x07E0, fake_display_get_pixel(11, 20));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(10, 21));
+    ASSERT_EQ_U16(0xFFFF, fake_display_get_pixel(11, 21));
+
+    contract_set_fetch(NULL, NULL);
+}
+
+static void test_uri_without_fetch_fails(void)
+{
+    const char *url = "http://host/x";
+    uint8_t msg[128];
+    size_t n;
+
+    contract_set_fetch(NULL, NULL);
+    n = contract_pack_rect_flags(
+        msg, sizeof(msg), 1, 1, 0, 0, 2, 2, CODEC_ENC_RAW_RGB565,
+        CONTRACT_FLAG_URI, (const uint8_t *)url, (uint32_t)strlen(url));
+    fake_display_reset();
+    ASSERT_EQ_INT(CONTRACT_ERR_FETCH, contract_dispatch(msg, n));
+}
+
 int main(void)
 {
     test_dispatch_clear();
@@ -119,5 +182,7 @@ int main(void)
     test_dispatch_rect_delta();
     test_clear_then_rect();
     test_bad_delta_payload();
+    test_dispatch_uri_rect();
+    test_uri_without_fetch_fails();
     return test_report();
 }

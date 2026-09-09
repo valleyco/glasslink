@@ -12,7 +12,10 @@
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
 #include "wd_config.h"
+#include "wd_http.h"
 #include "wd_mqtt.h"
+
+#include "contract.h"
 
 #include <stdio.h>
 
@@ -67,6 +70,8 @@ void wd_net_start(void)
 
     ESP_ERROR_CHECK(wd_cfg_load(&cfg));
     wifi_start(&cfg);
+
+    contract_set_fetch(wd_http_fetch, NULL);
 
     wd_mqtt_cfg_t m = {
         .uri = cfg.mqtt_uri,

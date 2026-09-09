@@ -113,13 +113,14 @@ No production feature lands without a failing host test written first (except pu
 | **W11** | Broker / buffers | LAN Mosquitto OK. **Raise esp-mqtt buffer** (e.g. 8 KiB); `inline_max` < buffer. Never retain rasters. | **agreed** |
 | **W13** | HAL test seam | **Shared `hal_display.h` + two `.c` backends** (link-time choice). Not vtable/function-pointer inject. | **agreed** |
 | **W14** | Post-v1 order | **A → D → (B or C):** (A) product polish, (D) thin Python scene/host composer, then either **B-http** (bigger pictures) or **L1 start** (fill/text + later binds) — pick at Step 10. No codec-v2 / LVGL until scheduled. | **agreed** |
+| **W15** | Step 10 path | **B-http**: `FLAG_URI` on `raster.rect`; MQTT carries URL; device `esp_http_client` GET → decode → blit. Cap body (no full-FB raw). L1 deferred. | **agreed** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–9 done**. Post-v1 locked as **W14**.  
-**Next:** Step **10** — pick **B-http** or early **L1** at go time.
+Steps **0–10-B done** (W14/W15). HTTP `FLAG_URI` pull live (`http_max` 64 KiB).  
+**Next:** early L1 (theme C) when scheduled — or polish/demo on glass.
 
 ---
 
@@ -319,15 +320,12 @@ Python composer: dirty rects / scene steps, auto encode (`codec_encode_auto` / C
 
 ---
 
-### Step 10 — Bigger pictures **or** useful UI (theme B **or** C)
-**Status:** `discuss` · **Depends on:** Step 9 · **Pick one at go time**
+### Step 10 — Bigger pictures via HTTP (theme B)
+**Status:** `done` (2026-09-09) · **Depends on:** Step 9 · **Picked:** B-http / **W15**
 
-| Path | Backlog | Sketch |
-|------|---------|--------|
-| **B** | B-http | MQTT cmd with `uri` flag; device HTTP GET → decode strip → blit; heap/timeout policy on no-PSRAM |
-| **C** | B1 / early L1 | Tiny L1: `fill_rect` + text (host-rasterized glyphs preferred first, or device bitmap font); value binds (**B2**) later |
+MQTT `raster.rect` + `FLAG_URI` → device HTTP GET → decode → blit. Body capped (`http_max` 65536). L1 (theme C) remains backlog.
 
-Do **not** start both in parallel. Codec v2 / LVGL stay backlog.
+**Delivered:** fetch hook + `wd_http`; host URI tests; `asset` / `--uri` / `http_rect.yaml`; docs. Host tests + IDF build green. ✓
 
 ---
 
@@ -344,7 +342,7 @@ Do **not** start both in parallel. Codec v2 / LVGL stay backlog.
 | B7 | Shared HAL component repo (if copy drifts) |
 | B8 | OTA |
 | B9 | Home Assistant discovery flavor |
-| B-http | HTTP `uri` pull when inline_max insufficient (W7 phase 2) — candidate Step 10-B |
+| B-http | HTTP `uri` pull — **done** Step 10-B (`FLAG_URI` / `wd_http`) |
 | B-cbor | CBOR/generic envelope when L1/bind need it (replace or sit beside binary) |
 | B-s3 | Build/verify profile #2 (S3+PSRAM) when hardware appears |
 | B-demo-text | Demo banner font — **fixed** Step 8a (`wd_text.py`) |
@@ -396,4 +394,4 @@ make build flash monitor   # IDF device (later)
 1. Dev Wi-Fi/MQTT credentials: **NVS namespace `wd`** (agreed 2026-09-09) — load first; seed from Kconfig once; `make flash-nvs` for CSV provision. Secrets never in git.
 2. Device id: **configured name** (NVS / `CONFIG_WD_DEVICE_ID`); host `WD_DEVICE` — **not** MAC suffix in v1 (Step 8c).
 3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
-4. Step 10 path: **B-http vs early L1** — decide at Step 10 go (W14).
+4. Step 10 path: **B-http** (locked). Early L1 remains backlog / later step.

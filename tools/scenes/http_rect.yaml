@@ -1,0 +1,34 @@
+# L0 HTTP URI pull (Step 10-B / W15)
+#
+# 1) Encode an asset (delta preferred for large rects):
+#      ./tools/wd_mqtt.py asset --w 160 --h 120 --pattern checker --enc auto \
+#          --out tools/.cache/http/panel.bin
+# 2) Serve on the LAN (device must reach this host):
+#      python3 -m http.server 8000 --directory tools/.cache/http
+# 3) Point URL at your PC's LAN IP, then:
+#      ./tools/wd_scene.py tools/scenes/http_rect.yaml --device cyd1
+#
+# Or one-shot inject:
+#   ./tools/wd_mqtt.py inject rect --device cyd1 --uri http://192.168.0.216:8000/panel.bin \
+#       --x 80 --y 60 --w 160 --h 120 --enc delta --wait-ack
+name: http_rect
+devices:
+  - cyd1
+defaults:
+  pause: 0.2
+steps:
+  - clear: { color: 0x0000 }
+  - banner:
+      text: "HTTP URI pull"
+      x: 0
+      y: 0
+      w: 320
+      h: 24
+  - uri:
+      # Override with -- not available; edit URL to your LAN IP before run.
+      url: http://192.168.0.216:8000/panel.bin
+      x: 80
+      y: 60
+      w: 160
+      h: 120
+      enc: raw   # checker often stays raw; use solid/UI for delta

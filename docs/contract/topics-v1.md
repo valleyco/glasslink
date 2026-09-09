@@ -21,6 +21,8 @@ LAN plaintext MQTT (W10). Device id is a **configured name** (NVS / `CONFIG_WD_D
   "device_id": "cyd1",
   "disp": { "w": 320, "h": 240 },
   "inline_max": 6144,
+  "http": true,
+  "http_max": 65536,
   "codecs": ["raw_rgb565", "delta_rle_v1"]
 }
 ```
@@ -31,3 +33,5 @@ Republished on every MQTT `CONNECTED` (covers reconnect).
 
 - `WD_DEVICE` / `--device` selects `{device_id}` (default often `cyd1`).
 - `./tools/wd_mqtt.py inject … --wait-ack` publishes then waits for matching `seq` on `ack`.
+- `./tools/wd_mqtt.py asset … --out FILE` encodes a body for HTTP serve.
+- `./tools/wd_mqtt.py inject rect --uri http://HOST/FILE …` sends `FLAG_URI` cmd.

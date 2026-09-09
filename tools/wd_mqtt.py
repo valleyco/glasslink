@@ -195,16 +195,18 @@ def enc_id(name: str) -> int:
 
 
 def build_rect_payload(args: argparse.Namespace) -> tuple[int, bytes]:
-    """Return (enc_id, codec_payload) for inject rect."""
+    """Return (enc_id, codec_payload) for inject rect / asset."""
     enc_name = args.enc
-    if args.payload_file:
-        data = Path(args.payload_file).read_bytes()
+    payload_file = getattr(args, "payload_file", None)
+    if payload_file:
+        data = Path(payload_file).read_bytes()
         if enc_name == "auto":
             raise ValueError("--payload-file cannot use --enc auto")
         return enc_id(enc_name), data
 
-    if args.rgb_file:
-        raw = Path(args.rgb_file).read_bytes()
+    rgb_file = getattr(args, "rgb_file", None)
+    if rgb_file:
+        raw = Path(rgb_file).read_bytes()
     elif args.pattern == "checker":
         raw = rgb565_checker(args.w, args.h, args.solid, args.solid2)
     elif args.pattern == "h_runs":
@@ -240,10 +242,32 @@ def cmd_inject(args: argparse.Namespace) -> int:
         if args.subcmd == "clear":
             payload = pack_clear(args.id, args.seq, args.color)
         elif args.subcmd == "rect":
-            enc, data = build_rect_payload(args)
-            payload = pack_rect(
-                args.id, args.seq, args.x, args.y, args.w, args.h, enc, data
-            )
+            uri = getattr(args, "uri", None)
+            if uri:
+                if not uri.startswith("http://"):
+                    raise ValueError("URI must be http:// (no TLS in v1)")
+                if len(uri) > 256:
+                    raise ValueError("URI longer than CONTRACT_URI_MAX (256)")
+                enc_name = args.enc
+                if enc_name == "auto":
+                    raise ValueError("--uri requires --enc raw or delta (body is pre-encoded)")
+                enc = ENC_RAW if enc_name == "raw" else ENC_DELTA
+                payload = pack_rect(
+                    args.id,
+                    args.seq,
+                    args.x,
+                    args.y,
+                    args.w,
+                    args.h,
+                    enc,
+                    uri.encode("utf-8"),
+                    flags=FLAG_URI,
+                )
+            else:
+                enc, data = build_rect_payload(args)
+                payload = pack_rect(
+                    args.id, args.seq, args.x, args.y, args.w, args.h, enc, data
+                )
             check_inline_max(payload, enforce=True)
         else:
             print("unknown inject subcmd", file=sys.stderr)
@@ -504,11 +528,9 @@ def cmd_loopback(args: argparse.Namespace) -> int:
         )
     )
 
-    # 5) URI flag must fail dispatch (W7)
-    uri_payload = pack_rect(
-        5, 5, 0, 0, 2, 2, ENC_RAW, rgb565_fill(2, 2, 0), flags=FLAG_URI
-    )
-    cases.append(("uri-reject", uri_payload, ["--expect-fail"]))
+    # 5) reserved flag bit must fail parse (URI alone is valid for rect)
+    bad_flag = pack_rect(5, 5, 0, 0, 2, 2, ENC_RAW, rgb565_fill(2, 2, 0), flags=0x02)
+    cases.append(("flag-reject", bad_flag, ["--expect-fail"]))
 
     results: list[tuple[str, int]] = []
     pending: list[tuple[str, list[str]]] = []
@@ -644,6 +666,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--payload-file",
         help="pre-encoded codec payload bytes (skips encode)",
     )
+    r.add_argument(
+        "--uri",
+        help="FLAG_URI: MQTT payload is this http:// URL; device GETs encoded body",
+    )
+
+    asset = sp.add_parser(
+        "asset",
+        help="encode RGB565 → file for HTTP serve (Step 10-B)",
+    )
+    asset.add_argument("--w", type=int, required=True)
+    asset.add_argument("--h", type=int, required=True)
+    asset.add_argument("--enc", choices=("raw", "delta", "auto"), default="auto")
+    asset.add_argument("--solid", type=lambda s: int(s, 0), default=0xF800)
+    asset.add_argument("--pattern", choices=("solid", "checker", "h_runs"), default="solid")
+    asset.add_argument("--solid2", type=lambda s: int(s, 0), default=0x001F)
+    asset.add_argument("--rgb-file", help="raw RGB565 LE source")
+    asset.add_argument("--out", required=True, help="output encoded body path")
 
     s = sp.add_parser("sim", help="host device simulator (subscribe → apply_bin)")
     _add_broker_args(s)
@@ -662,10 +701,26 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def cmd_asset(args: argparse.Namespace) -> int:
+    try:
+        ensure_encode_rect()
+        enc, data = build_rect_payload(args)
+    except (ValueError, subprocess.CalledProcessError) as e:
+        print(f"asset error: {e}", file=sys.stderr)
+        return 1
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(data)
+    print(f"wrote {len(data)} B enc={enc} → {out}")
+    return 0
+
+
 def main() -> int:
     args = build_parser().parse_args()
     if args.cmd == "inject":
         return cmd_inject(args)
+    if args.cmd == "asset":
+        return cmd_asset(args)
     if args.cmd == "sim":
         return cmd_sim(args)
     if args.cmd == "visual":

@@ -57,6 +57,7 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
 {
     const uint8_t *h;
     uint32_t plen;
+    uint8_t flags;
 
     if (!buf || !out) {
         return CONTRACT_ERR_ARG;
@@ -72,12 +73,15 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
     if (h[4] != CONTRACT_VER) {
         return CONTRACT_ERR_VER;
     }
-    if (h[6] != 0) {
+
+    flags = h[6];
+    /* Only FLAG_URI is defined; any other bit is an error. */
+    if ((flags & (uint8_t)~CONTRACT_FLAG_URI) != 0) {
         return CONTRACT_ERR_FLAGS;
     }
 
     out->type = h[5];
-    out->flags = h[6];
+    out->flags = flags;
     out->id = rd_u16(h + 8);
     out->seq = rd_u16(h + 10);
     out->x = rd_i16(h + 12);
@@ -97,6 +101,9 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
 
     switch (out->type) {
     case CONTRACT_TYPE_DISPLAY_CLEAR:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
         if (plen != 0) {
             return CONTRACT_ERR_ARG;
         }
@@ -111,6 +118,12 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
         if (out->enc != (uint8_t)CODEC_ENC_RAW_RGB565 &&
             out->enc != (uint8_t)CODEC_ENC_DELTA_RLE_V1) {
             return CONTRACT_ERR_ARG;
+        }
+        if (flags & CONTRACT_FLAG_URI) {
+            if (plen == 0 || plen > (uint32_t)CONTRACT_URI_MAX) {
+                return CONTRACT_ERR_PAYLOAD;
+            }
+            break;
         }
         if (out->enc == (uint8_t)CODEC_ENC_RAW_RGB565) {
             uint64_t need = (uint64_t)out->w * (uint64_t)out->h * 2ull;
@@ -140,14 +153,17 @@ size_t contract_pack_clear(uint8_t *out, size_t out_cap, uint16_t id,
     return (size_t)CONTRACT_HDR_SIZE;
 }
 
-size_t contract_pack_rect(uint8_t *out, size_t out_cap, uint16_t id,
-                          uint16_t seq, int16_t x, int16_t y, uint16_t w,
-                          uint16_t h, uint8_t enc, const uint8_t *payload,
-                          uint32_t payload_len)
+size_t contract_pack_rect_flags(uint8_t *out, size_t out_cap, uint16_t id,
+                                uint16_t seq, int16_t x, int16_t y, uint16_t w,
+                                uint16_t h, uint8_t enc, uint8_t flags,
+                                const uint8_t *payload, uint32_t payload_len)
 {
     size_t total = (size_t)CONTRACT_HDR_SIZE + (size_t)payload_len;
 
     if (!out || w == 0 || h == 0) {
+        return 0;
+    }
+    if ((flags & (uint8_t)~CONTRACT_FLAG_URI) != 0) {
         return 0;
     }
     if (payload_len > 0 && !payload) {
@@ -158,6 +174,7 @@ size_t contract_pack_rect(uint8_t *out, size_t out_cap, uint16_t id,
     }
     memset(out, 0, CONTRACT_HDR_SIZE);
     hdr_common(out, CONTRACT_TYPE_RASTER_RECT, id, seq);
+    out[6] = flags;
     wr_i16(out + 12, x);
     wr_i16(out + 14, y);
     wr_u16(out + 16, w);
@@ -170,4 +187,13 @@ size_t contract_pack_rect(uint8_t *out, size_t out_cap, uint16_t id,
         memcpy(out + CONTRACT_HDR_SIZE, payload, payload_len);
     }
     return total;
+}
+
+size_t contract_pack_rect(uint8_t *out, size_t out_cap, uint16_t id,
+                          uint16_t seq, int16_t x, int16_t y, uint16_t w,
+                          uint16_t h, uint8_t enc, const uint8_t *payload,
+                          uint32_t payload_len)
+{
+    return contract_pack_rect_flags(out, out_cap, id, seq, x, y, w, h, enc, 0,
+                                    payload, payload_len);
 }
