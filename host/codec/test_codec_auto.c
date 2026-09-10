@@ -40,5 +40,16 @@ int main(void)
     ASSERT_EQ_INT(CODEC_ENC_RAW_RGB565, (int)chosen);
     ASSERT_EQ_INT((int)((size_t)N * 2), (int)out_len);
 
+    /* Two-tone checker: few unique colors → try delta (may still size-fallback). */
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            rgb[y * W + x] = ((x + y) & 1) ? 0xFFFF : 0x0000;
+        }
+    }
+    ASSERT_EQ_INT(CODEC_OK,
+                  codec_encode_auto(rgb, W, H, out, sizeof(out), &out_len, &chosen));
+    ASSERT_TRUE(chosen == CODEC_ENC_RAW_RGB565 ||
+                chosen == CODEC_ENC_DELTA_RLE_V1);
+
     return test_report();
 }

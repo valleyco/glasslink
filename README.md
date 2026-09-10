@@ -110,7 +110,9 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0x001F
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0x001F --wait-ack
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0xF800
-./tools/wd_mqtt.py inject rect --device cyd1 --enc auto --solid 0x07E0 --w 48 --h 32 --x 20 --y 40
+./tools/wd_mqtt.py inject rect --device cyd1 --solid 0x07E0 --w 48 --h 32 --x 20 --y 40
+# default --enc auto (delta for UI; raw for noise/photos)
+# large photos: asset --enc auto + inject rect --uri http://… (not MQTT tiles)
 ```
 
 ---

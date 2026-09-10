@@ -145,6 +145,12 @@ def tile_and_publish(
 ) -> int:
     """Publish image as horizontal strips that fit inline_max."""
     assert len(raw) == w * h * 2
+    if w * h * 2 > 24 * 1024:
+        print(
+            f"  hint: {w}x{h} image is large for MQTT tiles — "
+            "prefer HTTP uri + asset --enc auto for photos",
+            file=sys.stderr,
+        )
     seq = seq_start
     y = 0
     while y < h:

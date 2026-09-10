@@ -111,6 +111,12 @@ def tile_rect(
     raw: bytes,
 ) -> int:
     assert len(raw) == w * h * 2
+    if w * h * 2 > 24 * 1024:
+        print(
+            f"  hint: {w}x{h} image is large for MQTT tiles — "
+            "prefer `uri` + `wd_mqtt.py asset --enc auto` for photos",
+            file=sys.stderr,
+        )
     y = 0
     while y < h:
         strip_h = min(16, h - y)
@@ -323,7 +329,12 @@ def run_scene(scene: dict, args: argparse.Namespace) -> int:
                 y = int(body.get("y", 0))
                 w = int(body["w"])
                 h = int(body["h"])
-                enc_name = str(body.get("enc", "delta"))
+                enc_name = str(body.get("enc", "")).strip()
+                if enc_name not in ("raw", "delta"):
+                    raise ValueError(
+                        "uri needs enc: raw|delta matching the served body "
+                        "(encode with: wd_mqtt.py asset --enc auto)"
+                    )
                 enc = wm.ENC_RAW if enc_name == "raw" else wm.ENC_DELTA
                 msg = wm.pack_rect(
                     cmd_id,

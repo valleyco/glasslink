@@ -287,7 +287,7 @@ Invaders-style `host/sim/wd-sim`: SDL2 window over `fake_display` 320×240 RGB56
 **Status:** `done` (2026-09-09) · **Depends on:** Step 2a–2b  
 
 **Freeze:** KEEP `raw_rgb565` + `delta_rle_v1` (v_then_h + byte RLE). Primary geo-mean **~37.7×** on UI/sparse/solid/runs. Doc: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).  
-**Host policy:** `codec_encode_auto` / `encode_rect --enc auto` (raw if `comp ≥ 0.98×raw`).  
+**Host policy:** `codec_encode_auto` / `--enc auto` (noisy→raw; else raw if `comp ≥ 0.98×raw`).  
 **Deferred:** QOI/JPEG/plain-RLE/predict knobs → backlog / `delta_rle_v2` host experiments.
 
 **Done when:** `docs/benches/codec-v1.md` has chosen profile + tables + keep/kill decision. ✓

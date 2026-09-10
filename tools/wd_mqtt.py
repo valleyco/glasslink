@@ -6,9 +6,9 @@ Uses local broker by default (127.0.0.1:1883). Binary L0 envelope = docs/contrac
 
 Examples:
   ./tools/wd_mqtt.py inject clear --device dev1 --color 0xF800
-  ./tools/wd_mqtt.py inject rect --device dev1 --x 10 --y 20 --w 8 --h 8 --enc raw
+  ./tools/wd_mqtt.py inject rect --device dev1 --x 10 --y 20 --w 8 --h 8
   ./tools/wd_mqtt.py inject rect --device dev1 --enc delta --solid 0x07E0 --w 32 --h 16
-  ./tools/wd_mqtt.py inject rect --device dev1 --pattern checker --enc delta --w 16 --h 8
+  ./tools/wd_mqtt.py inject rect --device dev1 --pattern checker --w 16 --h 8
   ./tools/wd_mqtt.py inject rect --device dev1 --rgb-file pixels.rgb --w 8 --h 8 --enc raw
   ./tools/wd_mqtt.py sim --device dev1 --apply ./host/mqtt/apply_bin
   ./tools/wd_mqtt.py visual --device sim1
@@ -859,7 +859,12 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--y", type=int, default=0)
     r.add_argument("--w", type=int, default=8)
     r.add_argument("--h", type=int, default=8)
-    r.add_argument("--enc", choices=("raw", "delta", "auto"), default="raw")
+    r.add_argument(
+        "--enc",
+        choices=("raw", "delta", "auto"),
+        default="auto",
+        help="wire codec (default auto: delta for UI, raw for noise/photos)",
+    )
     r.add_argument("--solid", type=lambda s: int(s, 0), default=0xF800)
     r.add_argument(
         "--solid2",

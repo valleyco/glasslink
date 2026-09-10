@@ -49,8 +49,9 @@ int codec_decode_rows(codec_enc_t enc, int w, int h, const uint8_t *in,
 /** Upper bound on encoded size for worst case (safe buffer sizing). */
 size_t codec_encode_bound(codec_enc_t enc, int w, int h);
 
-/** Prefer delta_rle_v1; fall back to raw if delta is not clearly smaller.
- *  Threshold: use raw when `delta_len * 100 >= raw_len * 98` (harness T3).
+/** Prefer delta_rle_v1 for UI-like content; use raw for noise/photos.
+ *  Order: sparse unique-color probe → else encode delta → raw if
+ *  `delta_len * 100 >= raw_len * 98`.
  *  @param chosen optional; receives the enc actually written.
  */
 int codec_encode_auto(const uint16_t *rgb, int w, int h, uint8_t *out,

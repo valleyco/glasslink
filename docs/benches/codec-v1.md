@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-09  
 **Decision:** **KEEP** `raw_rgb565` + **`delta_rle_v1`** as v1 wire codecs.  
-**Host policy:** `codec_encode_auto` — use delta unless `comp ≥ 0.98 × raw`, then raw.
+**Host policy:** `codec_encode_auto` — noisy/photo probe → raw; else delta unless `comp ≥ 0.98 × raw`, then raw.
 
 Normative bitstream: [`docs/contract/delta_rle_v1.md`](../contract/delta_rle_v1.md) (**frozen**).  
 Track A: `make test-codec` (raw + delta_rle + auto). Track B: `make bench-codec`.
@@ -42,13 +42,14 @@ Re-run: `make bench-codec` (also refreshes `docs/benches/codec-bench-mvp.md`).
 ## Encoder policy (host)
 
 ```text
+if looks_noisy(rgb)          → enc=raw_rgb565   # sparse unique-color probe
 encode delta_rle_v1
-if delta_len * 100 >= raw_len * 98 → emit raw_rgb565
-else → emit delta_rle_v1
+if delta_len * 100 >= raw_len * 98 → enc=raw_rgb565
+else → enc=delta_rle_v1
 ```
 
-API: `codec_encode_auto(...)`. CLI: `encode_rect --enc auto`.  
-Device still decodes whatever `enc` the envelope declares (no knobs on MCU).
+Tools default to `--enc auto` (`inject rect`, `asset`, scene/demo encode).  
+Large photos: prefer HTTP `uri` + `asset --enc auto` over many MQTT strips.
 
 ---
 
