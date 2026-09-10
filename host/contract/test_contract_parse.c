@@ -167,6 +167,40 @@ static void test_parse_rect_fields(void)
     ASSERT_TRUE(m.payload != NULL && m.payload[0] == 0x11);
 }
 
+static void test_parse_fill_rect(void)
+{
+    uint8_t buf[64];
+    contract_msg_t m;
+    size_t n = contract_pack_fill_rect(buf, sizeof(buf), 3, 4, 10, 20, 30, 40,
+                                       0xF800);
+    ASSERT_EQ_INT(CONTRACT_HDR_SIZE, (int)n);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_parse(buf, n, &m));
+    ASSERT_EQ_INT(CONTRACT_TYPE_FILL_RECT, m.type);
+    ASSERT_EQ_INT(10, m.x);
+    ASSERT_EQ_INT(20, m.y);
+    ASSERT_EQ_INT(30, m.w);
+    ASSERT_EQ_INT(40, m.h);
+    ASSERT_EQ_U16(0xF800, m.color);
+    ASSERT_EQ_INT(0, (int)m.payload_len);
+}
+
+static void test_parse_text(void)
+{
+    const char *s = "Hi";
+    uint8_t buf[64];
+    contract_msg_t m;
+    size_t n = contract_pack_text(buf, sizeof(buf), 1, 2, 5, 6, 0xFFFF, 2,
+                                  (const uint8_t *)s, 2);
+    ASSERT_TRUE(n == CONTRACT_HDR_SIZE + 2);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_parse(buf, n, &m));
+    ASSERT_EQ_INT(CONTRACT_TYPE_DRAW_TEXT, m.type);
+    ASSERT_EQ_INT(5, m.x);
+    ASSERT_EQ_INT(6, m.y);
+    ASSERT_EQ_INT(2, m.enc);
+    ASSERT_EQ_U16(0xFFFF, m.color);
+    ASSERT_EQ_INT(2, (int)m.payload_len);
+}
+
 int main(void)
 {
     test_pack_parse_clear();
@@ -182,5 +216,7 @@ int main(void)
     test_rect_zero_wh();
     test_clear_with_payload();
     test_parse_rect_fields();
+    test_parse_fill_rect();
+    test_parse_text();
     return test_report();
 }

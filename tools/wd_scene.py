@@ -199,20 +199,40 @@ def run_scene(scene: dict, args: argparse.Namespace) -> int:
                 color = parse_color(body.get("color", 0))
                 publish_all(client, devices, wm.pack_clear(cmd_id, seq, color))
                 seq += 1
-            elif op in ("fill", "rect", "solid"):
+            elif op in ("fill", "solid", "fill_rect"):
                 x = int(body.get("x", 0))
                 y = int(body.get("y", 0))
                 w = int(body["w"])
                 h = int(body["h"])
                 color = parse_color(body.get("color", body.get("solid", 0xF800)))
-                raw = wm.rgb565_fill(w, h, color)
-                enc, payload = encode_auto(w, h, raw)
-                msg = wm.pack_rect(cmd_id, seq, x, y, w, h, enc, payload)
-                if len(msg) > wm.INLINE_MAX:
-                    seq = tile_rect(client, devices, cmd_id, seq, x, y, w, h, raw)
+                if body.get("l0"):
+                    raw = wm.rgb565_fill(w, h, color)
+                    enc, payload = encode_auto(w, h, raw)
+                    msg = wm.pack_rect(cmd_id, seq, x, y, w, h, enc, payload)
+                    if len(msg) > wm.INLINE_MAX:
+                        seq = tile_rect(client, devices, cmd_id, seq, x, y, w, h, raw)
+                    else:
+                        publish_all(client, devices, msg)
+                        seq += 1
                 else:
-                    publish_all(client, devices, msg)
+                    publish_all(
+                        client,
+                        devices,
+                        wm.pack_fill_rect(cmd_id, seq, x, y, w, h, color),
+                    )
                     seq += 1
+            elif op in ("text", "draw_text"):
+                text = str(body.get("text", ""))
+                x = int(body.get("x", 0))
+                y = int(body.get("y", 0))
+                color = parse_color(body.get("color", 0xFFFF))
+                scale = int(body.get("scale", 2))
+                publish_all(
+                    client,
+                    devices,
+                    wm.pack_text(cmd_id, seq, x, y, color, text, scale=scale),
+                )
+                seq += 1
             elif op == "checker":
                 x = int(body.get("x", 0))
                 y = int(body.get("y", 0))

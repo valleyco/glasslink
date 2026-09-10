@@ -59,6 +59,14 @@ make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
 ./tools/wd_scene.py tools/scenes/hello.yaml --device cyd1
 ```
 
+### Early L1 (fill + device text)
+
+```bash
+./tools/wd_scene.py tools/scenes/l1_hello.yaml --device cyd1
+./tools/wd_mqtt.py inject fill --device cyd1 --x 10 --y 10 --w 100 --h 40 --color 0xF800
+./tools/wd_mqtt.py inject text --device cyd1 --x 16 --y 60 --text "hello" --scale 2
+```
+
 ### HTTP URI (large rects)
 
 Encode → serve on LAN → MQTT carries URL only (`FLAG_URI`):
@@ -119,8 +127,8 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 ## v1 scope
 
-**In:** L0 raster + clear, binary MQTT (inline **and** `FLAG_URI` HTTP pull), `raw_rgb565` + `delta_rle_v1`, host TDD, LAN plaintext MQTT.  
-**Out:** CBOR, touch, TLS, LVGL (see backlog in `PLAN.md`).
+**In:** L0 raster + clear, L1 `fill_rect` + `draw.text`, MQTT inline + `FLAG_URI` HTTP, codecs, host TDD, LAN plaintext MQTT.  
+**Out:** CBOR, touch, TLS, LVGL, value binds (see backlog in `PLAN.md`).
 
 ---
 

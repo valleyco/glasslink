@@ -26,11 +26,12 @@ static volatile bool s_connected;
 
 static void publish_status(void)
 {
-    char body[320];
+    char body[384];
     snprintf(body, sizeof(body),
              "{\"fw\":\"wl-display\",\"device_id\":\"%s\","
              "\"disp\":{\"w\":320,\"h\":240},"
              "\"inline_max\":%d,\"http\":true,\"http_max\":%u,"
+             "\"l1\":[\"fill_rect\",\"text\"],"
              "\"codecs\":[\"raw_rgb565\",\"delta_rle_v1\"]}",
              s_device, s_inline_max, (unsigned)wd_http_max_body());
     esp_mqtt_client_publish(s_client, s_topic_status, body, 0, 1, 1);

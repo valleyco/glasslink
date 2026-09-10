@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -17,10 +18,18 @@ void render_clear(uint16_t rgb565);
 int render_blit_rect(int x, int y, int w, int h, const uint16_t *rgb565);
 
 /**
- * Solid fill rect (helper for tests / later L1). Same clipping rules as HAL.
- * Returns 0 on success, -1 if w/h <= 0 after interpreting args as empty-only invalid when w or h <= 0.
+ * Solid fill rect. Same clipping rules as HAL.
+ * Returns 0 on success, -1 if w/h <= 0.
  */
 int render_fill_rect(int x, int y, int w, int h, uint16_t rgb565);
+
+/**
+ * Draw ASCII (bytes 0x20–0x7E) with built-in 5×7 font.
+ * scale is 1 or 2. Non-ASCII bytes skipped. Transparent background (set pixels only).
+ * Returns 0 on success, -1 if text is NULL / scale invalid.
+ */
+int render_draw_text(int x, int y, const uint8_t *text, size_t len, uint16_t color,
+                     int scale);
 
 #ifdef __cplusplus
 }

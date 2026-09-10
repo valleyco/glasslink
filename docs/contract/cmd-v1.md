@@ -1,4 +1,4 @@
-# L0 binary command envelope v1 (W9) + URI pull (W15 / Step 10-B)
+# L0/L1 binary command envelope (W9 + W15 URI + W16 early L1)
 
 Normative wire format for MQTT `cmd` payloads (and host tools).  
 **Little-endian** multi-byte fields. No CBOR/JSON on device v1.
@@ -18,72 +18,45 @@ Normative wire format for MQTT `cmd` payloads (and host tools).
 | 14 | 2 | `y` | int16 panel Y |
 | 16 | 2 | `w` | uint16 width |
 | 18 | 2 | `h` | uint16 height |
-| 20 | 1 | `enc` | `0=raw_rgb565`, `1=delta_rle_v1` |
-| 21 | 1 | `fmt` | `0=rgb565` only in v1 |
-| 22 | 2 | `color` | `display.clear` fill color; unused for rect |
+| 20 | 1 | `enc` | codec id **or** text scale (see type) |
+| 21 | 1 | `fmt` | `0=rgb565` for raster; unused for fill/text |
+| 22 | 2 | `color` | clear / fill / text fg |
 | 24 | 4 | `payload_len` | bytes following header |
 | 28 | `payload_len` | `payload` | type-specific |
 
-Total message size = `28 + payload_len`.  
-Truncation / `payload_len` past buffer → `CONTRACT_ERR_TRUNC`.
+Total message size = `28 + payload_len`.
 
 ## Types
 
-| `type` | Name | Payload | Geometry / color |
+| `type` | Name | Payload | Geometry / color / enc |
 |--------|------|---------|------------------|
-| `0x01` | `display.clear` | **empty** (`payload_len=0`) | `color` = RGB565; flags must be 0 |
-| `0x02` | `raster.rect` | encoded pixels **or** URI (see flags) | `x,y,w,h` required (`w,h≥1`); `enc` selects codec |
+| `0x01` | `display.clear` | empty | `color` = RGB565; flags 0 |
+| `0x02` | `raster.rect` | pixels **or** URI | `x,y,w,h`; `enc` = codec |
+| `0x03` | `display.fill_rect` | empty | `x,y,w,h` + `color`; flags 0 |
+| `0x04` | `draw.text` | UTF-8 (1…64) | `x,y` origin; `color` = fg; `enc` = scale (0/1→1, 2→2) |
 
 ## Flags
 
 | Bit | Name | Meaning |
 |-----|------|---------|
-| 0 | `FLAG_URI` | MQTT payload is UTF-8 `http://…` URL (1…256 bytes). Device HTTP GETs the body; body is the same codec bytes that would have been inline. |
-| 1–7 | reserved | must be 0 → `CONTRACT_ERR_FLAGS` |
+| 0 | `FLAG_URI` | On `raster.rect` only: MQTT payload is `http://…` URL |
+| 1–7 | reserved | must be 0 |
 
-## `raster.rect` payload rules
+## `raster.rect`
 
-### Inline (`FLAG_URI` clear)
+**Inline:** `enc=0` raw (`payload_len == w*h*2`); `enc=1` delta_rle_v1.  
+**URI:** payload = URL (≤256); device GET body = encoded pixels; `http_max` default 65536.
 
-- `fmt` must be `0` (RGB565).
-- `enc=0` (raw): `payload_len == w * h * 2`.
-- `enc=1` (`delta_rle_v1`): bitstream per [`delta_rle_v1.md`](delta_rle_v1.md); `payload_len ≥ 1`.
+## `draw.text`
 
-### URI (`FLAG_URI` set)
+Device 5×7 ASCII (`0x20`–`0x7E`); transparent bg; scale 1 or 2; advance `6*scale` px.
 
-- Payload = URL bytes (not NUL-terminated); `1 ≤ payload_len ≤ 256`.
-- URL scheme **`http://` only** (no TLS — W10).
-- HTTP response body = encoded pixels for `enc` / `w` / `h` (raw length check applies to the **body**, not MQTT).
-- Device body cap: **`http_max`** (default 65536) advertised on `status`. Prefer `delta_rle_v1` for large rects; full-frame raw (≈150 KiB) will not fit.
+## Errors
 
-Decoder streams **rows** into `hal_display_blit`. Fetch hook: `contract_set_fetch` (device: `wd_http_fetch`).
+`CONTRACT_ERR_*` as before, plus fetch failures for URI.
 
-## Reject conditions (non-exhaustive)
+## Pack API
 
-| Code | When |
-|------|------|
-| `CONTRACT_ERR_MAGIC` | magic ≠ `WLD1` |
-| `CONTRACT_ERR_VER` | `ver ≠ 1` |
-| `CONTRACT_ERR_TYPE` | unknown type |
-| `CONTRACT_ERR_FLAGS` | reserved flag bits; URI on clear |
-| `CONTRACT_ERR_ARG` | clear with payload; rect with w/h=0; bad fmt/enc |
-| `CONTRACT_ERR_TRUNC` | buffer shorter than header or header+payload |
-| `CONTRACT_ERR_PAYLOAD` | raw length mismatch / codec failure / bad URI length |
-| `CONTRACT_ERR_NOSPACE` | scratch alloc fail |
-| `CONTRACT_ERR_FETCH` | no fetch hook / HTTP failure / oversized body |
-
-## Host API surface
-
-```c
-int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out);
-int contract_apply(const contract_msg_t *msg);
-int contract_dispatch(const uint8_t *buf, size_t len);
-void contract_set_fetch(contract_fetch_fn fn, void *user);
-size_t contract_pack_clear(...);
-size_t contract_pack_rect(...);
-size_t contract_pack_rect_flags(..., uint8_t flags, ...);
-```
-
-See `components/contract/include/contract.h`.
+`contract_pack_clear`, `contract_pack_rect[_flags]`, `contract_pack_fill_rect`, `contract_pack_text`.
 
 MQTT topics: [`topics-v1.md`](topics-v1.md).

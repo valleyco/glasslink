@@ -18,9 +18,9 @@ Device (ESP-IDF)
     net/mqtt → contract → codec → render → hal_display (ST7789 SPI)
 ```
 
-- **Control plane:** MQTT binary commands (inline only in v1).
+- **Control plane:** MQTT binary commands (L0 + early L1).
 - **Bulk HTTP `uri`:** Step 10-B — `FLAG_URI` + device GET (`http_max` cap)
-- **Display language v1:** L0 rects + clear only.
+- **Display language:** L0 rects/clear + L1 `fill_rect` / `draw.text` (W16)
 
 ## Frozen decisions (see PLAN.md)
 

@@ -97,6 +97,25 @@ int contract_apply(const contract_msg_t *msg)
         }
         return apply_rect_pixels(msg, msg->payload, (size_t)msg->payload_len);
 
+    case CONTRACT_TYPE_FILL_RECT:
+        if (render_fill_rect((int)msg->x, (int)msg->y, (int)msg->w, (int)msg->h,
+                             msg->color) != 0) {
+            return CONTRACT_ERR_ARG;
+        }
+        return CONTRACT_OK;
+
+    case CONTRACT_TYPE_DRAW_TEXT: {
+        int scale = (msg->enc == 0) ? 1 : (int)msg->enc;
+        if (!msg->payload || msg->payload_len == 0) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        if (render_draw_text((int)msg->x, (int)msg->y, msg->payload,
+                             (size_t)msg->payload_len, msg->color, scale) != 0) {
+            return CONTRACT_ERR_ARG;
+        }
+        return CONTRACT_OK;
+    }
+
     default:
         return CONTRACT_ERR_TYPE;
     }

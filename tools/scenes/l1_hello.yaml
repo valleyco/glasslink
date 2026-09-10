@@ -1,0 +1,13 @@
+# Early L1: fill_rect + device 5×7 text (Step 11 / W16)
+name: l1_hello
+devices:
+  - cyd1
+defaults:
+  pause: 0.2
+steps:
+  - clear: { color: 0x0011 }
+  - fill: { x: 8, y: 40, w: 304, h: 60, color: 0x0410 }
+  - text: { text: "wl-display L1", x: 16, y: 56, color: 0xFFE0, scale: 2 }
+  - fill: { x: 8, y: 120, w: 140, h: 80, color: 0xF800 }
+  - fill: { x: 172, y: 120, w: 140, h: 80, color: 0x07E0 }
+  - text: { text: "fill+text", x: 16, y: 210, color: 0xFFFF, scale: 2 }

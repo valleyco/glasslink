@@ -175,6 +175,47 @@ static void test_uri_without_fetch_fails(void)
     ASSERT_EQ_INT(CONTRACT_ERR_FETCH, contract_dispatch(msg, n));
 }
 
+static void test_dispatch_fill_rect(void)
+{
+    uint8_t buf[64];
+    size_t n;
+
+    fake_display_reset();
+    n = contract_pack_clear(buf, sizeof(buf), 0, 0, 0x0000);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(buf, n));
+    n = contract_pack_fill_rect(buf, sizeof(buf), 1, 1, 10, 20, 5, 3, 0xF800);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(buf, n));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(10, 20));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(14, 22));
+    ASSERT_EQ_U16(0x0000, fake_display_get_pixel(9, 20));
+    ASSERT_EQ_U16(0x0000, fake_display_get_pixel(15, 20));
+}
+
+static void test_dispatch_text(void)
+{
+    const char *s = "A";
+    uint8_t buf[64];
+    size_t n;
+    int lit = 0;
+    int x, y;
+
+    fake_display_reset();
+    n = contract_pack_clear(buf, sizeof(buf), 0, 0, 0x0000);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(buf, n));
+    n = contract_pack_text(buf, sizeof(buf), 1, 1, 0, 0, 0xFFFF, 1,
+                           (const uint8_t *)s, 1);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(buf, n));
+    /* 'A' glyph should light some pixels in 5×7 box */
+    for (y = 0; y < 7; y++) {
+        for (x = 0; x < 5; x++) {
+            if (fake_display_get_pixel(x, y) == 0xFFFF) {
+                lit++;
+            }
+        }
+    }
+    ASSERT_TRUE(lit > 5);
+}
+
 int main(void)
 {
     test_dispatch_clear();
@@ -184,5 +225,7 @@ int main(void)
     test_bad_delta_payload();
     test_dispatch_uri_rect();
     test_uri_without_fetch_fails();
+    test_dispatch_fill_rect();
+    test_dispatch_text();
     return test_report();
 }

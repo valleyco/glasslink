@@ -49,11 +49,14 @@ MAGIC = b"WLD1"
 HDR_SIZE = 28
 TYPE_CLEAR = 0x01
 TYPE_RECT = 0x02
+TYPE_FILL = 0x03
+TYPE_TEXT = 0x04
 ENC_RAW = 0
 ENC_DELTA = 1
 FMT_RGB565 = 0
 FLAG_URI = 1 << 0
 INLINE_MAX = 6144  # docs/contract/mqtt-topics-v1.md
+TEXT_MAX = 64
 
 # LE header: magic[4] ver type flags pad id seq x y w h enc fmt color payload_len
 _HDR = "<4sBBBBHHhhHHBBHI"
@@ -78,6 +81,64 @@ def pack_clear(id_: int, seq: int, color: int) -> bytes:
         color & 0xFFFF,
         0,  # payload_len
     )
+
+
+def pack_fill_rect(
+    id_: int, seq: int, x: int, y: int, w: int, h: int, color: int
+) -> bytes:
+    return struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_FILL,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        x,
+        y,
+        w & 0xFFFF,
+        h & 0xFFFF,
+        0,
+        FMT_RGB565,
+        color & 0xFFFF,
+        0,
+    )
+
+
+def pack_text(
+    id_: int,
+    seq: int,
+    x: int,
+    y: int,
+    color: int,
+    text: str,
+    scale: int = 2,
+) -> bytes:
+    raw = text.encode("utf-8")
+    if not raw or len(raw) > TEXT_MAX:
+        raise ValueError(f"text length must be 1..{TEXT_MAX} bytes")
+    if scale not in (0, 1, 2):
+        raise ValueError("scale must be 0, 1, or 2")
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_TEXT,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        x,
+        y,
+        0,
+        0,
+        scale & 0xFF,
+        FMT_RGB565,
+        color & 0xFFFF,
+        len(raw),
+    )
+    return hdr + raw
 
 
 def pack_rect(
@@ -241,6 +302,21 @@ def cmd_inject(args: argparse.Namespace) -> int:
     try:
         if args.subcmd == "clear":
             payload = pack_clear(args.id, args.seq, args.color)
+        elif args.subcmd == "fill":
+            payload = pack_fill_rect(
+                args.id, args.seq, args.x, args.y, args.w, args.h, args.color
+            )
+        elif args.subcmd == "text":
+            payload = pack_text(
+                args.id,
+                args.seq,
+                args.x,
+                args.y,
+                args.color,
+                args.text,
+                scale=args.scale,
+            )
+            check_inline_max(payload, enforce=True)
         elif args.subcmd == "rect":
             uri = getattr(args, "uri", None)
             if uri:
@@ -637,6 +713,22 @@ def build_parser() -> argparse.ArgumentParser:
     c = isub.add_parser("clear")
     _inj_common(c)
     c.add_argument("--color", type=lambda s: int(s, 0), default=0x0000)
+
+    f = isub.add_parser("fill", help="L1 display.fill_rect")
+    _inj_common(f)
+    f.add_argument("--x", type=int, default=0)
+    f.add_argument("--y", type=int, default=0)
+    f.add_argument("--w", type=int, default=8)
+    f.add_argument("--h", type=int, default=8)
+    f.add_argument("--color", type=lambda s: int(s, 0), default=0xF800)
+
+    tcmd = isub.add_parser("text", help="L1 draw.text (5x7 device font)")
+    _inj_common(tcmd)
+    tcmd.add_argument("--x", type=int, default=0)
+    tcmd.add_argument("--y", type=int, default=0)
+    tcmd.add_argument("--color", type=lambda s: int(s, 0), default=0xFFFF)
+    tcmd.add_argument("--scale", type=int, choices=(1, 2), default=2)
+    tcmd.add_argument("--text", required=True)
 
     r = isub.add_parser("rect")
     _inj_common(r)

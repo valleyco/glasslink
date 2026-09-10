@@ -114,13 +114,13 @@ No production feature lands without a failing host test written first (except pu
 | **W13** | HAL test seam | **Shared `hal_display.h` + two `.c` backends** (link-time choice). Not vtable/function-pointer inject. | **agreed** |
 | **W14** | Post-v1 order | **A → D → (B or C):** (A) product polish, (D) thin Python scene/host composer, then either **B-http** (bigger pictures) or **L1 start** (fill/text + later binds) — pick at Step 10. No codec-v2 / LVGL until scheduled. | **agreed** |
 | **W15** | Step 10 path | **B-http**: `FLAG_URI` on `raster.rect`; MQTT carries URL; device `esp_http_client` GET → decode → blit. Cap body (no full-FB raw). L1 deferred. | **agreed** |
+| **W16** | Early L1 slice | **fill_rect** + **draw.text** (device 5×7 ASCII bitmap, fg color, no binds yet). No draw.batch / groups / LVGL. Binds = B2 later. | **agreed** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–10-B done** (W14/W15). HTTP `FLAG_URI` pull live (`http_max` 64 KiB).  
-**Next:** early L1 (theme C) when scheduled — or polish/demo on glass.
+Steps **0–11 done** (W16 early L1: fill_rect + text). Next: binds (B2) or polish.
 
 ---
 
@@ -329,11 +329,25 @@ MQTT `raster.rect` + `FLAG_URI` → device HTTP GET → decode → blit. Body ca
 
 ---
 
+### Step 11 — Early L1: fill_rect + text (theme C)
+**Status:** `done` (2026-09-10) · **Depends on:** Step 10 · **Decision:** W16
+
+| Op | Type | Notes |
+|----|------|-------|
+| `display.fill_rect` | `0x03` | x,y,w,h + `color`; empty payload |
+| `draw.text` | `0x04` | x,y + fg `color`; UTF-8 payload (≤64); device 5×7 font |
+
+Host TDD first. No value binds (B2), no groups/batch, no LVGL.
+
+**Delivered:** contract `0x03`/`0x04`, 5×7 font in render, inject/scene `fill`+`text`, `l1_hello.yaml`. ✓
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
 |----|------|
-| B1 | L1 draw.batch + groups (earliest slice may land in Step 10-C) |
+| B1 | L1 draw.batch + groups (fill/text started in Step 11) |
 | B2 | MQTT value binds → text slots |
 | B3 | TLS / credentials story (**W10**) |
 | B4 | Touch events upward (reuse invaders touch later) |
@@ -394,4 +408,4 @@ make build flash monitor   # IDF device (later)
 1. Dev Wi-Fi/MQTT credentials: **NVS namespace `wd`** (agreed 2026-09-09) — load first; seed from Kconfig once; `make flash-nvs` for CSV provision. Secrets never in git.
 2. Device id: **configured name** (NVS / `CONFIG_WD_DEVICE_ID`); host `WD_DEVICE` — **not** MAC suffix in v1 (Step 8c).
 3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
-4. Step 10 path: **B-http** (locked). Early L1 remains backlog / later step.
+4. Step 10 path: **B-http** (locked). Step 11 early L1: **W16** (fill_rect + text).
