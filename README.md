@@ -138,7 +138,8 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 | `tools/scenes/` | example scenes |
 | `docs/contract/` | wire formats + MQTT topics |
 
-Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
+Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).  
+Flash vs DRAM placement: [`docs/memory-placement.md`](docs/memory-placement.md) (`make audit-mem` after `build-mqtt`).
 
 ---
 

@@ -447,6 +447,16 @@ v1 success: steady operation **without** PSRAM and **without** full FB after Wi-
 
 **Step 13 (done):** decode_rows streams RLE (no residual `malloc`); HTTP URI uses a fixed static body pool; status advertises `heap_free` / `heap_largest`. Encoder scratch still heap on host. Remaining risk: 64 KiB static HTTP pool + Wi‑Fi/MQTT concurrent pressure — watch `heap_largest` on glass.
 
+### Const → flash vs mutable → DRAM
+
+| Kind | Placement | How |
+|------|-----------|-----|
+| Tables / fonts (`static const`, e.g. `FONT5X7`) | **Flash** `.rodata` (DROM) | Plain C `const` — IDF default; **no** Arduino `PROGMEM` / IDF attrs in shared code |
+| HTTP body, groups, binds, SPI strips | **DRAM** `.bss` | Mutable `static` pools by design |
+| Host gcc builds | process r/o / BSS | Same sources; no `ESP_PLATFORM` placement macros |
+
+**Check after device link:** `make audit-mem` → [`tools/audit_elf_mem.py`](tools/audit_elf_mem.py) (needs `build-mqtt` map). Doc: [`docs/memory-placement.md`](docs/memory-placement.md).
+
 ---
 
 ## Working agreement

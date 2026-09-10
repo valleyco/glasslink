@@ -5,7 +5,8 @@
 
 /*
  * 5×7 ASCII glyphs (0x20–0x7E), each row = low 5 bits (MSB left).
- * Compact public-domain-style bitmaps for thin-client labels.
+ * static const → IDF .rodata (flash DROM), not DRAM. Host: normal r/o.
+ * Verify: make audit-mem (after build-mqtt).
  */
 static const uint8_t FONT5X7[95][7] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /*   */

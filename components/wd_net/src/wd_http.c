@@ -20,6 +20,7 @@ static const char *TAG = "wd_http";
 #define WD_HTTP_TIMEOUT_MS 8000
 #endif
 
+/* Mutable RX pool → .bss DRAM (not flash). See docs/memory-placement.md. */
 static uint8_t s_body[WD_HTTP_MAX_BODY];
 
 size_t wd_http_max_body(void)

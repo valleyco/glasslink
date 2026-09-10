@@ -21,6 +21,7 @@ typedef struct {
 static contract_fetch_fn s_fetch;
 static contract_fetch_release_fn s_fetch_release;
 static void *s_fetch_user;
+/* Mutable group payloads → .bss DRAM. Const tables stay .rodata (audit-mem). */
 static group_slot_t s_groups[CONTRACT_GROUP_SLOTS];
 
 void contract_set_fetch(contract_fetch_fn fn, void *user)

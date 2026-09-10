@@ -4,7 +4,7 @@ IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
 .PHONY: test test-render test-codec test-contract test-bind bench-codec mqtt-loopback \
-	sim sim-mqtt demo demo-fetch demo-sim scene clean \
+	sim sim-mqtt demo demo-fetch demo-sim scene clean audit-mem \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
@@ -67,6 +67,10 @@ build-mqtt:
 	fi
 	$(IDF) -B build-esp32-mqtt -D SDKCONFIG=sdkconfig.esp32 -D MQTT_MAIN=1 reconfigure
 	$(IDF) -B build-esp32-mqtt -D SDKCONFIG=sdkconfig.esp32 -D MQTT_MAIN=1 build
+
+# Const→flash / pools→DRAM check (needs build-mqtt map)
+audit-mem:
+	python3 tools/audit_elf_mem.py
 
 build-lcd-smoke:
 	@if [ ! -f build-esp32-lcd-smoke/build.ninja ]; then \
