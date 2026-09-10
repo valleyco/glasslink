@@ -120,16 +120,18 @@ No production feature lands without a failing host test written first (except pu
 | **W19** | Showcase demo | After feature set is in place (not before): one **full** host-driven demo that exercises the product end-to-end on glass (and SDL). Builds on `wd_demo` / `wd_scene` — not a new stack. | **agreed** |
 | **W20** | L1 batch + groups (B1) | **draw.batch** + **group** slots (define/draw). No CBOR/LVGL; fill+text sub-ops only. | **done** |
 | **W21** | Delta codec exit | Lab extract (Step 16) + **removed from product** (Step 17): wire `enc=0` raw only. | **done** |
-| **W22** | L1 filled polygon | **`draw.poly`**: filled convex/simple polygon, capped vertex count (≤16), RGB565 fill. Usable standalone + as **batch/group sub-op**. Driver: better icons (e.g. sun disk + triangle rays). Axis-aligned `fill_rect` stays. Outline-rect / circle = follow-ons if needed. | **agreed** |
+| **W22** | L1 filled polygon | **`draw.poly`**: filled convex/simple polygon, capped vertex count (≤16), RGB565 fill. Usable standalone + as **batch/group sub-op**. Driver: better icons (e.g. sun disk + triangle rays). Axis-aligned `fill_rect` stays. Outline-rect / circle = follow-ons if needed. | **done** |
+| **W23** | Draw cursor / current position | Device keeps a **graphics pen state**: `(x,y)` current position (+ later optional color/stroke). Ops: `move_to` / `line_to` (and path ops below) update it. Absolute coords remain valid; relative drawing uses the pen. Reset on `display.clear`. Batch/group may inherit or snapshot pen — detail at step discuss. | **done** |
+| **W24** | L1 path strokes | After W22/W23: **`line`**, **quadratic/cubic Bézier** (stroked, capped segments), optional arc. Built on pen state. No AA in first cut. | **done** |
+| **W25** | Charts as compositions | **Gauge / bar / pie** are **not** first-class device opcodes initially. Host (or later L2) composes them from fill_rect, poly, arcs/bézier, text, binds. Optional later: thin `chart.*` helpers on host only, or device macros if measured demand. | **done** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–17 done**. Panel + showcase host paths ready (glass QA in progress).
+Steps **0–17, 19–22 done**. Panel + showcase on glass.
 **Next milestone:** **Touch upward (B4 → Step 18)** — discuss/lock wire + host hit-test/context, then `go`.  
-**Also locked:** **L1 polygon (W22 / Step 19 / B-poly)** — wait for `go` after or beside touch.  
-Also: `make panel-sim` / `showcase-sim` when useful.
+Flash firmware after Steps 19–22 to get poly/pen/path on device.
 
 
 ---
@@ -390,12 +392,13 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 | Groups | define → clear → `group.draw` |
 | Live values | Bind slots ticking (clock + fake temp via `bind/+/set`) |
 | Big art | HTTP `FLAG_URI` panel (`tools/.cache/showcase/panel.bin`) |
+| Draw stack | Poly sun, cubic/line path, host `wd_charts` bar/gauge/pie (W22–W25) |
 | Motion | Dirty-rect sliding fill |
 | Multi-device | `--device` repeatable |
 
-**Deliverables:** [`tools/wd_showcase.py`](tools/wd_showcase.py), [`tools/scenes/showcase.yaml`](tools/scenes/showcase.yaml) (static slice), `make showcase` / `showcase-sim`, `--dry-run`. SDL visual expands URI host-side (`wd_mqtt.expand_uri_for_host`).
+**Deliverables:** [`tools/wd_showcase.py`](tools/wd_showcase.py), [`tools/scenes/showcase.yaml`](tools/scenes/showcase.yaml) (static slice), `make showcase` / `showcase-sim`, `--dry-run`. SDL visual expands URI host-side (`wd_mqtt.expand_uri_for_host`). Companion charts scene: [`tools/scenes/charts_demo.yaml`](tools/scenes/charts_demo.yaml).
 
-**Done when:** one command demos the story on sim and on glass; docs point to it as the flagship path. ✓ (eyeball deferred — no board / DISPLAY yet)
+**Done when:** one command demos the story on sim and on glass; docs point to it as the flagship path. ✓ (updated for Steps 19–22 draw stack)
 
 ---
 
@@ -432,20 +435,38 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 ---
 
 ### Step 19 — L1 filled polygon (W22 / B-poly)
-**Status:** `agreed` · **Depends on:** Step 11+ (render/contract) · **Decision:** W22  
-**Do not start until explicit `go`.**
+**Status:** `done` · **Depends on:** Step 11+ (render/contract) · **Decision:** W22  
 
 **Intent:** `draw.poly` — filled polygon for icons/UI (sun disk≈N-gon + triangle rays, chevrons, etc.).
 
-| Slice | Intent |
-|-------|--------|
-| 19a | Host TDD: `render_fill_poly` on fake_display (goldens) |
-| 19b | Contract type + pack/parse; batch/group sub-op |
-| 19c | Tools (`wd_mqtt` / scene) + status caps; optional panel sunny icon upgrade |
+| Slice | Intent | Result |
+|-------|--------|--------|
+| 19a | Host TDD: `render_fill_poly` on fake_display | ✓ |
+| 19b | Contract type `0x0A` + batch/group sub-op | ✓ |
+| 19c | Tools + panel sunny icon upgrade | ✓ |
 
-**Caps (locked):** ≤ **16** vertices; fill only (no stroke/AA in this step); points int16 panel coords; reject degenerate / oversize payloads.
+**Caps:** ≤ **16** vertices; fill only; points int16. ✓
 
-**Done when:** host tests green; IDF builds; one scene/panel glyph uses poly; docs updated.
+---
+
+### Step 20 — Draw pen / current position (W23)
+**Status:** `done` · **Depends on:** Step 11+ · **Decision:** W23  
+
+Device pen `(x,y)`: `move_to` `0x0B`, `line_to` `0x0C`. Cleared on `display.clear`. Batch sub-ops. ✓
+
+---
+
+### Step 21 — Lines & Bézier (W24)
+**Status:** `done` · **Depends on:** Step 20 (pen) · **Decision:** W24  
+
+Stroked line via `line_to`; **cubic Bézier** `0x0D` (`cubic_to`) sampled to segments. ✓
+
+---
+
+### Step 22 — Charts via composition (W25)
+**Status:** `done` · **Depends on:** Steps 19–21 · **Decision:** W25  
+
+Host recipes: [`tools/wd_charts.py`](tools/wd_charts.py) — `bar_graph`, `gauge`, `pie`. ✓
 
 ---
 
@@ -458,7 +479,10 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 | B3 | TLS / credentials on device — **declined for LAN product** (W10); revisit only if public-broker threat model |
 | B-wg | WireGuard on device (`esp_wireguard`) — **backlog**; after product polish + measured `heap_free`/`heap_largest` headroom. Prefer gateway WG until then. |
 | B4 | Touch events upward — **next milestone** (Step 18). Device: raw press/move/release + x,y over MQTT. Host: per-device **context** + hit-regions → actions. Reuse invaders touch HAL when on glass. |
-| B-poly | L1 filled polygon (`draw.poly`) — **locked W22 / Step 19**; ≤16 verts; batch/group sub-op; redo panel sun/icons after. Wait for `go`. |
+| B-poly | L1 filled polygon — **done** Step 19 (W22) |
+| B-pen | Draw current position / pen — **done** Step 20 (W23) |
+| B-path | Line + Bézier strokes — **done** Step 21 (W24) |
+| B-chart | Gauge / bar / pie host recipes — **done** Step 22 (W25) · `tools/wd_charts.py` |
 | B5 | Image sequence / P-frame compression |
 | B6 | Huffman / YUV plane modes on delta_rle → **lab repo** (Step 16), not product |
 | B-codec-lab | Extract delta_rle lab — **done** Step 16 → `../delta-rle-lab` |
@@ -540,4 +564,5 @@ make build flash monitor   # IDF device (later)
 8. Delta exit (W21): Steps **16–17** **done** (lab `../delta-rle-lab`; product raw-only).
 9. WireGuard (**B-wg**): backlog after product + heap headroom; TLS stays out (W10).
 10. **Next milestone:** Touch (**B4** / Step 18) — raw device events; host hit-regions + context (multi-client daemon). Not scheduled until discuss → `go`.
-11. **L1 polygon (W22 / Step 19 / B-poly)** — **agreed**; wait for `go` (filled poly ≤16 verts; batch/group; panel sun).
+11. **L1 polygon (W22 / Step 19)** — **done**.
+12. **Draw pen (W23 / Step 20)**, **line/Bézier (W24 / Step 21)**, **charts compose (W25 / Step 22)** — **done**.

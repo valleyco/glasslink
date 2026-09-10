@@ -39,6 +39,12 @@ Total message size = `28 + payload_len`.
 | `0x07` | `draw.batch` | packed sub-ops | see batch (W20) |
 | `0x08` | `group.define` | packed sub-ops | `id` = group 0..3; store + draw |
 | `0x09` | `group.draw` | empty | `id` = group; redraw stored |
+| `0x0A` | `draw.poly` | `n×(x,y)` i16 LE | `enc`=n (3..16); `color`=fill |
+| `0x0B` | `draw.move_to` | empty | set pen `(x,y)` |
+| `0x0C` | `draw.line_to` | empty | stroke pen→`(x,y)` with `color`; advance pen |
+| `0x0D` | `draw.cubic_to` | 6×i16 P1,P2,P3 | cubic from pen; `color`; pen→P3 |
+
+`display.clear` resets the draw **pen**.
 
 ## Flags
 
@@ -76,8 +82,14 @@ Payload of `draw.batch` and `group.define` is a sequence of sub-ops (LE), max **
 |----|------|--------|
 | fill | `0x03` | `x:i16 y:i16 w:u16 h:u16 color:u16` (11 B total) |
 | text | `0x04` | `x:i16 y:i16 color:u16 scale:u8 len:u8 utf8[len]` (9+len) |
+| poly | `0x0A` | `n:u8 color:u16` + `n×(x,y)` i16 |
+| move_to | `0x0B` | `x:i16 y:i16` |
+| line_to | `0x0C` | `x:i16 y:i16 color:u16` |
+| cubic_to | `0x0D` | `color:u16` + P1,P2,P3 i16 |
 
 `group.define` (`id` 0..3) applies then stores the payload. `group.draw` re-runs the stored batch (no heap). Four static group slots.
+
+Host chart recipes (bar/gauge/pie): [`tools/wd_charts.py`](../../tools/wd_charts.py) (W25).
 
 ## Errors
 
@@ -85,6 +97,6 @@ Payload of `draw.batch` and `group.define` is a sequence of sub-ops (LE), max **
 
 ## Pack API
 
-`contract_pack_clear`, `contract_pack_rect[_flags]`, `contract_pack_fill_rect`, `contract_pack_text`, `contract_pack_batch`, `contract_pack_group_*`.
+`contract_pack_clear`, `contract_pack_rect[_flags]`, `contract_pack_fill_rect`, `contract_pack_text`, `contract_pack_poly`, `contract_pack_move_to` / `line_to` / `cubic_to`, `contract_pack_batch`, `contract_pack_group_*`.
 
 MQTT topics: [`topics-v1.md`](topics-v1.md).

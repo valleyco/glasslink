@@ -212,6 +212,42 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
             return CONTRACT_ERR_ARG;
         }
         break;
+    case CONTRACT_TYPE_DRAW_POLY:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (out->enc < 3 || out->enc > (uint8_t)CONTRACT_POLY_MAX) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (plen != (uint32_t)out->enc * 4u) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        break;
+    case CONTRACT_TYPE_MOVE_TO:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (plen != 0) {
+            return CONTRACT_ERR_ARG;
+        }
+        break;
+    case CONTRACT_TYPE_LINE_TO:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (plen != 0) {
+            return CONTRACT_ERR_ARG;
+        }
+        break;
+    case CONTRACT_TYPE_CUBIC_TO:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        /* payload: x1 y1 x2 y2 x3 y3 */
+        if (plen != 12) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        break;
     default:
         return CONTRACT_ERR_TYPE;
     }
@@ -463,4 +499,148 @@ size_t contract_pack_group_draw(uint8_t *out, size_t out_cap, uint16_t group,
     hdr_common(out, CONTRACT_TYPE_GROUP_DRAW, group, seq);
     wr_u32(out + 24, 0);
     return (size_t)CONTRACT_HDR_SIZE;
+}
+
+size_t contract_pack_poly(uint8_t *out, size_t out_cap, uint16_t id,
+                          uint16_t seq, uint16_t color, uint8_t n,
+                          const int16_t *xy)
+{
+    uint32_t plen;
+    size_t total;
+    uint8_t i;
+    if (!out || !xy || n < 3 || n > (uint8_t)CONTRACT_POLY_MAX) {
+        return 0;
+    }
+    plen = (uint32_t)n * 4u;
+    total = (size_t)CONTRACT_HDR_SIZE + (size_t)plen;
+    if (out_cap < total) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_DRAW_POLY, id, seq);
+    out[20] = n; /* enc */
+    wr_u16(out + 22, color);
+    wr_u32(out + 24, plen);
+    for (i = 0; i < n; i++) {
+        wr_i16(out + CONTRACT_HDR_SIZE + (size_t)i * 4u, xy[i * 2]);
+        wr_i16(out + CONTRACT_HDR_SIZE + (size_t)i * 4u + 2u, xy[i * 2 + 1]);
+    }
+    return total;
+}
+
+size_t contract_pack_move_to(uint8_t *out, size_t out_cap, uint16_t id,
+                             uint16_t seq, int16_t x, int16_t y)
+{
+    if (!out || out_cap < (size_t)CONTRACT_HDR_SIZE) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_MOVE_TO, id, seq);
+    wr_i16(out + 12, x);
+    wr_i16(out + 14, y);
+    wr_u32(out + 24, 0);
+    return (size_t)CONTRACT_HDR_SIZE;
+}
+
+size_t contract_pack_line_to(uint8_t *out, size_t out_cap, uint16_t id,
+                             uint16_t seq, int16_t x, int16_t y,
+                             uint16_t color)
+{
+    if (!out || out_cap < (size_t)CONTRACT_HDR_SIZE) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_LINE_TO, id, seq);
+    wr_i16(out + 12, x);
+    wr_i16(out + 14, y);
+    wr_u16(out + 22, color);
+    wr_u32(out + 24, 0);
+    return (size_t)CONTRACT_HDR_SIZE;
+}
+
+size_t contract_pack_cubic_to(uint8_t *out, size_t out_cap, uint16_t id,
+                              uint16_t seq, uint16_t color, int16_t x1,
+                              int16_t y1, int16_t x2, int16_t y2, int16_t x3,
+                              int16_t y3)
+{
+    size_t total = (size_t)CONTRACT_HDR_SIZE + 12u;
+    if (!out || out_cap < total) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_CUBIC_TO, id, seq);
+    wr_u16(out + 22, color);
+    wr_u32(out + 24, 12);
+    wr_i16(out + CONTRACT_HDR_SIZE + 0, x1);
+    wr_i16(out + CONTRACT_HDR_SIZE + 2, y1);
+    wr_i16(out + CONTRACT_HDR_SIZE + 4, x2);
+    wr_i16(out + CONTRACT_HDR_SIZE + 6, y2);
+    wr_i16(out + CONTRACT_HDR_SIZE + 8, x3);
+    wr_i16(out + CONTRACT_HDR_SIZE + 10, y3);
+    return total;
+}
+
+size_t contract_batch_put_poly(uint8_t *dst, size_t dst_cap, uint16_t color,
+                               uint8_t n, const int16_t *xy)
+{
+    size_t need;
+    uint8_t i;
+    if (!dst || !xy || n < 3 || n > (uint8_t)CONTRACT_POLY_MAX) {
+        return 0;
+    }
+    need = 4u + (size_t)n * 4u; /* op,n,color + points */
+    if (dst_cap < need) {
+        return 0;
+    }
+    dst[0] = CONTRACT_BATCH_OP_POLY;
+    dst[1] = n;
+    wr_u16(dst + 2, color);
+    for (i = 0; i < n; i++) {
+        wr_i16(dst + 4 + (size_t)i * 4u, xy[i * 2]);
+        wr_i16(dst + 4 + (size_t)i * 4u + 2u, xy[i * 2 + 1]);
+    }
+    return need;
+}
+
+size_t contract_batch_put_move_to(uint8_t *dst, size_t dst_cap, int16_t x,
+                                  int16_t y)
+{
+    if (!dst || dst_cap < 5) {
+        return 0;
+    }
+    dst[0] = CONTRACT_BATCH_OP_MOVE_TO;
+    wr_i16(dst + 1, x);
+    wr_i16(dst + 3, y);
+    return 5;
+}
+
+size_t contract_batch_put_line_to(uint8_t *dst, size_t dst_cap, int16_t x,
+                                  int16_t y, uint16_t color)
+{
+    if (!dst || dst_cap < 7) {
+        return 0;
+    }
+    dst[0] = CONTRACT_BATCH_OP_LINE_TO;
+    wr_i16(dst + 1, x);
+    wr_i16(dst + 3, y);
+    wr_u16(dst + 5, color);
+    return 7;
+}
+
+size_t contract_batch_put_cubic_to(uint8_t *dst, size_t dst_cap, uint16_t color,
+                                   int16_t x1, int16_t y1, int16_t x2,
+                                   int16_t y2, int16_t x3, int16_t y3)
+{
+    if (!dst || dst_cap < 15) {
+        return 0;
+    }
+    dst[0] = CONTRACT_BATCH_OP_CUBIC_TO;
+    wr_u16(dst + 1, color);
+    wr_i16(dst + 3, x1);
+    wr_i16(dst + 5, y1);
+    wr_i16(dst + 7, x2);
+    wr_i16(dst + 9, y2);
+    wr_i16(dst + 11, x3);
+    wr_i16(dst + 13, y3);
+    return 15;
 }

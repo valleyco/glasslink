@@ -110,18 +110,34 @@ def icon_ops(kind: str) -> list:
         ops.append({"fill": {"x": x + ox, "y": y + oy, "w": w, "h": h, "color": c}})
 
     if kind == "clear":
-        f(22, 22, 20, 20, COL_SUN)
-        for ox, oy, w, h in (
-            (30, 6, 4, 10),
-            (30, 48, 4, 10),
-            (6, 30, 10, 4),
-            (48, 30, 10, 4),
-            (12, 12, 8, 4),
-            (44, 12, 8, 4),
-            (12, 48, 8, 4),
-            (44, 48, 8, 4),
-        ):
-            f(ox, oy, w, h, COL_SUN)
+        # Sun: filled disk (N-gon) + triangle rays (W22) — absolute panel coords
+        import math
+
+        n = 12
+        cx0, cy0, rr = x + 32, y + 32, 12
+        disk = [
+            [
+                int(cx0 + rr * math.cos(2 * math.pi * i / n)),
+                int(cy0 + rr * math.sin(2 * math.pi * i / n)),
+            ]
+            for i in range(n)
+        ]
+        ops.append({"poly": {"color": COL_SUN, "points": disk}})
+        for i in range(8):
+            a = 2 * math.pi * i / 8
+            tip = [
+                int(cx0 + 28 * math.cos(a)),
+                int(cy0 + 28 * math.sin(a)),
+            ]
+            b1 = [
+                int(cx0 + 16 * math.cos(a - 0.18)),
+                int(cy0 + 16 * math.sin(a - 0.18)),
+            ]
+            b2 = [
+                int(cx0 + 16 * math.cos(a + 0.18)),
+                int(cy0 + 16 * math.sin(a + 0.18)),
+            ]
+            ops.append({"poly": {"color": COL_SUN, "points": [tip, b1, b2]}})
     elif kind == "cloudy":
         f(8, 28, 36, 18, COL_CLOUD)
         f(28, 22, 28, 24, COL_CLOUD)

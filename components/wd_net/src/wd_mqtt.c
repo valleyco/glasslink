@@ -38,7 +38,8 @@ static void publish_status(void)
              "{\"fw\":\"wl-display\",\"device_id\":\"%s\","
              "\"disp\":{\"w\":320,\"h\":240},"
              "\"inline_max\":%d,\"http\":true,\"http_max\":%u,"
-             "\"l1\":[\"fill_rect\",\"text\",\"batch\"],\"bind_slots\":%d,"
+             "\"l1\":[\"fill_rect\",\"text\",\"batch\",\"poly\",\"move_to\","
+             "\"line_to\",\"cubic_to\"],\"bind_slots\":%d,"
              "\"groups\":%d,\"heap_free\":%u,\"heap_largest\":%u,"
              "\"codecs\":[\"raw_rgb565\"]}",
              s_device, s_inline_max, (unsigned)wd_http_max_body(),

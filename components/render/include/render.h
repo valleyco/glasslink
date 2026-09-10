@@ -31,6 +31,24 @@ int render_fill_rect(int x, int y, int w, int h, uint16_t rgb565);
 int render_draw_text(int x, int y, const uint8_t *text, size_t len, uint16_t color,
                      int scale);
 
+enum { RENDER_POLY_MAX = 16, RENDER_BEZIER_STEPS = 16 };
+
+/**
+ * Filled simple polygon. pts = [x0,y0,x1,y1,…]; n verts in 3..RENDER_POLY_MAX.
+ * Even-odd fill. Returns 0 on success, -1 on bad args.
+ */
+int render_fill_poly(const int16_t *pts, int n, uint16_t color);
+
+/** Bresenham line (1×1 fills). */
+int render_draw_line(int x0, int y0, int x1, int y1, uint16_t color);
+
+/**
+ * Cubic Bézier from (x0,y0) through controls (x1,y1),(x2,y2) to (x3,y3).
+ * Sampled into RENDER_BEZIER_STEPS line segments.
+ */
+int render_draw_cubic_bezier(int x0, int y0, int x1, int y1, int x2, int y2,
+                             int x3, int y3, uint16_t color);
+
 #ifdef __cplusplus
 }
 #endif

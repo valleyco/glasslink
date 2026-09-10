@@ -56,6 +56,10 @@ TYPE_BIND_SET = 0x06
 TYPE_BATCH = 0x07
 TYPE_GROUP_DEFINE = 0x08
 TYPE_GROUP_DRAW = 0x09
+TYPE_POLY = 0x0A
+TYPE_MOVE_TO = 0x0B
+TYPE_LINE_TO = 0x0C
+TYPE_CUBIC_TO = 0x0D
 ENC_RAW = 0
 FMT_RGB565 = 0
 FLAG_URI = 1 << 0
@@ -263,6 +267,42 @@ def batch_ops_bytes(ops: list) -> bytes:
                 "<BhhHBB", TYPE_TEXT, x, y, color, scale & 0xFF, len(raw)
             )
             out += raw
+        elif kind in ("poly", "polygon"):
+            color = _parse_color(body.get("color", 0xFFFF))
+            pts = body.get("points") or body.get("xy")
+            if not isinstance(pts, (list, tuple)) or len(pts) < 3:
+                raise ValueError("poly needs points: [[x,y],…] (≥3)")
+            if len(pts) > 16:
+                raise ValueError("poly max 16 points")
+            out += struct.pack("<BBH", TYPE_POLY, len(pts), color)
+            for p in pts:
+                out += struct.pack("<hh", int(p[0]), int(p[1]))
+        elif kind in ("move_to", "move"):
+            out += struct.pack(
+                "<Bhh", TYPE_MOVE_TO, int(body["x"]), int(body["y"])
+            )
+        elif kind in ("line_to", "line"):
+            color = _parse_color(body.get("color", 0xFFFF))
+            out += struct.pack(
+                "<BhhH",
+                TYPE_LINE_TO,
+                int(body["x"]),
+                int(body["y"]),
+                color,
+            )
+        elif kind in ("cubic_to", "cubic", "bezier"):
+            color = _parse_color(body.get("color", 0xFFFF))
+            out += struct.pack(
+                "<BHhhhhhh",
+                TYPE_CUBIC_TO,
+                color,
+                int(body["x1"]),
+                int(body["y1"]),
+                int(body["x2"]),
+                int(body["y2"]),
+                int(body["x3"]),
+                int(body["y3"]),
+            )
         else:
             raise ValueError(f"unknown batch op {kind!r}")
     if len(out) > BATCH_BYTES_MAX:
@@ -339,6 +379,99 @@ def pack_group_draw(group: int, seq: int) -> bytes:
         0,
         0,
     )
+
+
+def pack_poly(id_: int, seq: int, color: int, points: list) -> bytes:
+    n = len(points)
+    if n < 3 or n > 16:
+        raise ValueError("poly needs 3..16 points")
+    body = b"".join(struct.pack("<hh", int(p[0]), int(p[1])) for p in points)
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_POLY,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        0,
+        0,
+        0,
+        0,
+        n & 0xFF,
+        FMT_RGB565,
+        color & 0xFFFF,
+        len(body),
+    )
+    return hdr + body
+
+
+def pack_move_to(id_: int, seq: int, x: int, y: int) -> bytes:
+    return struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_MOVE_TO,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        int(x),
+        int(y),
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        0,
+        0,
+    )
+
+
+def pack_line_to(id_: int, seq: int, x: int, y: int, color: int) -> bytes:
+    return struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_LINE_TO,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        int(x),
+        int(y),
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        color & 0xFFFF,
+        0,
+    )
+
+
+def pack_cubic_to(
+    id_: int, seq: int, color: int, x1: int, y1: int, x2: int, y2: int, x3: int, y3: int
+) -> bytes:
+    body = struct.pack("<hhhhhh", x1, y1, x2, y2, x3, y3)
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_CUBIC_TO,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        0,
+        0,
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        color & 0xFFFF,
+        len(body),
+    )
+    return hdr + body
 
 
 def topic_bind_set(device: str, slot: int) -> str:

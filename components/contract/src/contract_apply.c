@@ -23,6 +23,9 @@ static contract_fetch_release_fn s_fetch_release;
 static void *s_fetch_user;
 /* Mutable group payloads → .bss DRAM. Const tables stay .rodata (audit-mem). */
 static group_slot_t s_groups[CONTRACT_GROUP_SLOTS];
+static int16_t s_pen_x;
+static int16_t s_pen_y;
+static uint8_t s_pen_valid;
 
 void contract_set_fetch(contract_fetch_fn fn, void *user)
 {
@@ -38,6 +41,13 @@ void contract_set_fetch_release(contract_fetch_release_fn fn)
 void contract_group_reset(void)
 {
     memset(s_groups, 0, sizeof(s_groups));
+}
+
+void contract_pen_reset(void)
+{
+    s_pen_x = 0;
+    s_pen_y = 0;
+    s_pen_valid = 0;
 }
 
 static void release_fetch_body(uint8_t *body)
@@ -163,6 +173,78 @@ int contract_apply_batch(const uint8_t *ops, size_t len)
                 return CONTRACT_ERR_ARG;
             }
             i += (size_t)tlen;
+        } else if (op == CONTRACT_BATCH_OP_POLY) {
+            uint8_t n;
+            uint16_t color;
+            int16_t pts[CONTRACT_POLY_MAX * 2];
+            uint8_t k;
+            if (i + 3 > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            n = ops[i];
+            color = rd_u16(ops + i + 1);
+            i += 3;
+            if (n < 3 || n > (uint8_t)CONTRACT_POLY_MAX) {
+                return CONTRACT_ERR_ARG;
+            }
+            if (i + (size_t)n * 4u > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            for (k = 0; k < n; k++) {
+                pts[k * 2] = rd_i16(ops + i + (size_t)k * 4u);
+                pts[k * 2 + 1] = rd_i16(ops + i + (size_t)k * 4u + 2u);
+            }
+            i += (size_t)n * 4u;
+            if (render_fill_poly(pts, (int)n, color) != 0) {
+                return CONTRACT_ERR_ARG;
+            }
+        } else if (op == CONTRACT_BATCH_OP_MOVE_TO) {
+            if (i + 4 > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            s_pen_x = rd_i16(ops + i);
+            s_pen_y = rd_i16(ops + i + 2);
+            s_pen_valid = 1;
+            i += 4;
+        } else if (op == CONTRACT_BATCH_OP_LINE_TO) {
+            int16_t x, y;
+            uint16_t color;
+            if (i + 6 > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            if (!s_pen_valid) {
+                return CONTRACT_ERR_ARG;
+            }
+            x = rd_i16(ops + i);
+            y = rd_i16(ops + i + 2);
+            color = rd_u16(ops + i + 4);
+            i += 6;
+            (void)render_draw_line((int)s_pen_x, (int)s_pen_y, (int)x, (int)y,
+                                   color);
+            s_pen_x = x;
+            s_pen_y = y;
+        } else if (op == CONTRACT_BATCH_OP_CUBIC_TO) {
+            uint16_t color;
+            int16_t x1, y1, x2, y2, x3, y3;
+            if (i + 14 > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            if (!s_pen_valid) {
+                return CONTRACT_ERR_ARG;
+            }
+            color = rd_u16(ops + i);
+            x1 = rd_i16(ops + i + 2);
+            y1 = rd_i16(ops + i + 4);
+            x2 = rd_i16(ops + i + 6);
+            y2 = rd_i16(ops + i + 8);
+            x3 = rd_i16(ops + i + 10);
+            y3 = rd_i16(ops + i + 12);
+            i += 14;
+            (void)render_draw_cubic_bezier((int)s_pen_x, (int)s_pen_y, (int)x1,
+                                           (int)y1, (int)x2, (int)y2, (int)x3,
+                                           (int)y3, color);
+            s_pen_x = x3;
+            s_pen_y = y3;
         } else {
             return CONTRACT_ERR_TYPE;
         }
@@ -213,6 +295,7 @@ int contract_apply(const contract_msg_t *msg)
     switch (msg->type) {
     case CONTRACT_TYPE_DISPLAY_CLEAR:
         render_clear(msg->color);
+        contract_pen_reset();
         return CONTRACT_OK;
 
     case CONTRACT_TYPE_RASTER_RECT:
@@ -312,6 +395,64 @@ int contract_apply(const contract_msg_t *msg)
 
     case CONTRACT_TYPE_GROUP_DRAW:
         return group_draw_apply((uint8_t)msg->id);
+
+    case CONTRACT_TYPE_DRAW_POLY: {
+        int16_t pts[CONTRACT_POLY_MAX * 2];
+        uint8_t n = msg->enc;
+        uint8_t k;
+        if (!msg->payload || n < 3 || n > (uint8_t)CONTRACT_POLY_MAX) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (msg->payload_len != (uint32_t)n * 4u) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        for (k = 0; k < n; k++) {
+            pts[k * 2] = (int16_t)(msg->payload[k * 4] |
+                                   ((uint16_t)msg->payload[k * 4 + 1] << 8));
+            pts[k * 2 + 1] =
+                (int16_t)(msg->payload[k * 4 + 2] |
+                          ((uint16_t)msg->payload[k * 4 + 3] << 8));
+        }
+        if (render_fill_poly(pts, (int)n, msg->color) != 0) {
+            return CONTRACT_ERR_ARG;
+        }
+        return CONTRACT_OK;
+    }
+
+    case CONTRACT_TYPE_MOVE_TO:
+        s_pen_x = msg->x;
+        s_pen_y = msg->y;
+        s_pen_valid = 1;
+        return CONTRACT_OK;
+
+    case CONTRACT_TYPE_LINE_TO:
+        if (!s_pen_valid) {
+            return CONTRACT_ERR_ARG;
+        }
+        (void)render_draw_line((int)s_pen_x, (int)s_pen_y, (int)msg->x,
+                               (int)msg->y, msg->color);
+        s_pen_x = msg->x;
+        s_pen_y = msg->y;
+        return CONTRACT_OK;
+
+    case CONTRACT_TYPE_CUBIC_TO: {
+        int16_t x1, y1, x2, y2, x3, y3;
+        if (!s_pen_valid || !msg->payload || msg->payload_len != 12) {
+            return CONTRACT_ERR_ARG;
+        }
+        x1 = (int16_t)(msg->payload[0] | ((uint16_t)msg->payload[1] << 8));
+        y1 = (int16_t)(msg->payload[2] | ((uint16_t)msg->payload[3] << 8));
+        x2 = (int16_t)(msg->payload[4] | ((uint16_t)msg->payload[5] << 8));
+        y2 = (int16_t)(msg->payload[6] | ((uint16_t)msg->payload[7] << 8));
+        x3 = (int16_t)(msg->payload[8] | ((uint16_t)msg->payload[9] << 8));
+        y3 = (int16_t)(msg->payload[10] | ((uint16_t)msg->payload[11] << 8));
+        (void)render_draw_cubic_bezier((int)s_pen_x, (int)s_pen_y, (int)x1,
+                                       (int)y1, (int)x2, (int)y2, (int)x3,
+                                       (int)y3, msg->color);
+        s_pen_x = x3;
+        s_pen_y = y3;
+        return CONTRACT_OK;
+    }
 
     default:
         return CONTRACT_ERR_TYPE;

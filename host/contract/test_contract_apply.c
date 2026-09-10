@@ -278,6 +278,34 @@ static void test_group_draw_undefined_fails(void)
     ASSERT_EQ_INT(CONTRACT_ERR_ARG, contract_dispatch(msg, n));
 }
 
+static void test_dispatch_poly_and_pen(void)
+{
+    uint8_t msg[128];
+    size_t n;
+    const int16_t tri[] = {40, 10, 10, 50, 70, 50};
+
+    fake_display_reset();
+    contract_pen_reset();
+    n = contract_pack_clear(msg, sizeof(msg), 1, 1, 0x0000);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    n = contract_pack_poly(msg, sizeof(msg), 1, 2, 0xFFE0, 3, tri);
+    ASSERT_TRUE(n > 0);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0xFFE0, fake_display_get_pixel(40, 20));
+
+    n = contract_pack_move_to(msg, sizeof(msg), 1, 3, 5, 5);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    n = contract_pack_line_to(msg, sizeof(msg), 1, 4, 20, 5, 0xF800);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(5, 5));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(20, 5));
+
+    n = contract_pack_cubic_to(msg, sizeof(msg), 1, 5, 0x07E0, 25, 5, 35, 5, 45,
+                               5);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0x07E0, fake_display_get_pixel(45, 5));
+}
+
 int main(void)
 {
     test_dispatch_clear();
@@ -293,5 +321,6 @@ int main(void)
     test_dispatch_batch();
     test_dispatch_group();
     test_group_draw_undefined_fails();
+    test_dispatch_poly_and_pen();
     return test_report();
 }

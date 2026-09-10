@@ -2,6 +2,8 @@
 #include "hal_display.h"
 
 #include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 /*
  * 5×7 ASCII glyphs (0x20–0x7E), each row = low 5 bits (MSB left).
@@ -173,6 +175,131 @@ int render_draw_text(int x, int y, const uint8_t *text, size_t len, uint16_t col
             }
         }
         cx += 6 * scale; /* 5 px glyph + 1 px gap */
+    }
+    return 0;
+}
+
+static int cmp_int(const void *a, const void *b)
+{
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+    return (ia > ib) - (ia < ib);
+}
+
+int render_fill_poly(const int16_t *pts, int n, uint16_t color)
+{
+    int ymin, ymax, y, i;
+    int nodes[RENDER_POLY_MAX];
+
+    if (!pts || n < 3 || n > RENDER_POLY_MAX) {
+        return -1;
+    }
+    ymin = ymax = (int)pts[1];
+    for (i = 0; i < n; i++) {
+        int py = (int)pts[i * 2 + 1];
+        if (py < ymin) {
+            ymin = py;
+        }
+        if (py > ymax) {
+            ymax = py;
+        }
+    }
+    if (ymin > ymax) {
+        return -1;
+    }
+    for (y = ymin; y <= ymax; y++) {
+        int nnodes = 0;
+        for (i = 0; i < n; i++) {
+            int j = (i + 1) % n;
+            int y0 = (int)pts[i * 2 + 1];
+            int y1 = (int)pts[j * 2 + 1];
+            int x0 = (int)pts[i * 2];
+            int x1 = (int)pts[j * 2];
+            if (y0 == y1) {
+                continue;
+            }
+            if ((y >= y0 && y < y1) || (y >= y1 && y < y0)) {
+                int64_t num = (int64_t)(y - y0) * (int64_t)(x1 - x0);
+                int den = y1 - y0;
+                int x = x0 + (int)(num / den);
+                if (nnodes < RENDER_POLY_MAX) {
+                    nodes[nnodes++] = x;
+                }
+            }
+        }
+        if (nnodes < 2) {
+            continue;
+        }
+        qsort(nodes, (size_t)nnodes, sizeof(nodes[0]), cmp_int);
+        for (i = 0; i + 1 < nnodes; i += 2) {
+            int xL = nodes[i];
+            int xR = nodes[i + 1];
+            if (xR >= xL) {
+                (void)render_fill_rect(xL, y, xR - xL + 1, 1, color);
+            }
+        }
+    }
+    return 0;
+}
+
+int render_draw_line(int x0, int y0, int x1, int y1, uint16_t color)
+{
+    int dx = (x1 > x0) ? (x1 - x0) : (x0 - x1);
+    int sx = (x0 < x1) ? 1 : -1;
+    int dy = (y1 > y0) ? (y0 - y1) : (y1 - y0);
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx + dy;
+    int x = x0;
+    int y = y0;
+
+    for (;;) {
+        (void)hal_display_fill_rect(x, y, 1, 1, color);
+        if (x == x1 && y == y1) {
+            break;
+        }
+        {
+            int e2 = 2 * err;
+            if (e2 >= dy) {
+                err += dy;
+                x += sx;
+            }
+            if (e2 <= dx) {
+                err += dx;
+                y += sy;
+            }
+        }
+    }
+    return 0;
+}
+
+static int bezier_point(int p0, int p1, int p2, int p3, int t, int n)
+{
+    /* De Casteljau in integer: t/n */
+    int64_t u = (int64_t)(n - t);
+    int64_t v = (int64_t)t;
+    int64_t n2 = (int64_t)n * (int64_t)n;
+    int64_t n3 = n2 * (int64_t)n;
+    int64_t a = u * u * u;
+    int64_t b = 3 * u * u * v;
+    int64_t c = 3 * u * v * v;
+    int64_t d = v * v * v;
+    return (int)((a * p0 + b * p1 + c * p2 + d * p3) / n3);
+}
+
+int render_draw_cubic_bezier(int x0, int y0, int x1, int y1, int x2, int y2,
+                             int x3, int y3, uint16_t color)
+{
+    int n = RENDER_BEZIER_STEPS;
+    int px = x0;
+    int py = y0;
+    int t;
+
+    for (t = 1; t <= n; t++) {
+        int qx = bezier_point(x0, x1, x2, x3, t, n);
+        int qy = bezier_point(y0, y1, y2, y3, t, n);
+        (void)render_draw_line(px, py, qx, qy, color);
+        px = qx;
+        py = qy;
     }
     return 0;
 }

@@ -103,6 +103,39 @@ static void test_blit_rejects_bad_args(void)
     ASSERT_EQ_INT(-1, render_fill_rect(0, 0, -1, 1, 0));
 }
 
+static void test_fill_poly_triangle(void)
+{
+    const uint16_t yel = 0xFFE0;
+    const int16_t pts[] = {40, 10, 10, 50, 70, 50};
+    fake_display_reset();
+    render_clear(0x0000);
+    ASSERT_EQ_INT(0, render_fill_poly(pts, 3, yel));
+    ASSERT_EQ_U16(yel, fake_display_get_pixel(40, 20));
+    ASSERT_EQ_U16(0x0000, fake_display_get_pixel(5, 5));
+    ASSERT_TRUE(fake_display_count_color(yel) > 100);
+}
+
+static void test_draw_line_horizontal(void)
+{
+    const uint16_t c = 0xF800;
+    fake_display_reset();
+    render_clear(0x0000);
+    ASSERT_EQ_INT(0, render_draw_line(10, 15, 25, 15, c));
+    ASSERT_EQ_U16(c, fake_display_get_pixel(10, 15));
+    ASSERT_EQ_U16(c, fake_display_get_pixel(25, 15));
+    ASSERT_EQ_INT(16, (int)fake_display_count_color(c));
+}
+
+static void test_draw_cubic_bezier_endpoints(void)
+{
+    const uint16_t c = 0x07E0;
+    fake_display_reset();
+    render_clear(0x0000);
+    ASSERT_EQ_INT(0, render_draw_cubic_bezier(0, 0, 10, 0, 20, 0, 30, 0, c));
+    ASSERT_EQ_U16(c, fake_display_get_pixel(0, 0));
+    ASSERT_EQ_U16(c, fake_display_get_pixel(30, 0));
+}
+
 static void test_hal_size(void)
 {
     int w = -1;
@@ -123,5 +156,8 @@ int main(void)
     test_blit_pattern();
     test_blit_clip_negative_origin();
     test_blit_rejects_bad_args();
+    test_fill_poly_triangle();
+    test_draw_line_horizontal();
+    test_draw_cubic_bezier_endpoints();
     return test_report();
 }

@@ -1,4 +1,4 @@
-# Step 14 companion — static chrome slice (no live binds / HTTP / motion).
+# Step 14 companion — static chrome + draw-stack slice (no live binds / HTTP / motion).
 # Full flagship: ./tools/wd_showcase.py  |  make showcase / showcase-sim
 #
 #   ./tools/wd_scene.py tools/scenes/showcase.yaml --device cyd1
@@ -29,3 +29,56 @@ steps:
   - group_draw: { group: 0 }
   - sleep: 0.4
   - group_draw: { group: 0 }
+  - sleep: 0.4
+  # W22–W25 draw stack (static; full pacing in wd_showcase.py)
+  - clear: { color: 0x0011 }
+  - batch:
+      ops:
+        - fill: { x: 0, y: 0, w: 320, h: 28, color: 0x0410 }
+        - text: { x: 8, y: 6, color: 0xFFE0, scale: 2, text: "DRAW STACK" }
+        - text: { x: 8, y: 40, color: 0x07FF, scale: 1, text: "poly + path" }
+        - poly:
+            color: 0xFFE0
+            points:
+              - [56, 72]
+              - [72, 88]
+              - [56, 104]
+              - [40, 88]
+        - move_to: { x: 100, y: 100 }
+        - cubic_to:
+            x1: 130
+            y1: 50
+            x2: 170
+            y2: 140
+            x3: 200
+            y3: 70
+            color: 0x07E0
+        - line_to: { x: 240, y: 100, color: 0xF81F }
+  - sleep: 0.5
+  - batch:
+      ops:
+        - fill: { x: 8, y: 130, w: 100, h: 70, color: 0x2104 }
+        - fill: { x: 12, y: 170, w: 16, h: 30, color: 0x07E0 }
+        - fill: { x: 32, y: 150, w: 16, h: 50, color: 0x07E0 }
+        - fill: { x: 52, y: 160, w: 16, h: 40, color: 0x07E0 }
+        - fill: { x: 72, y: 145, w: 16, h: 55, color: 0x07E0 }
+        - poly:
+            color: 0x8410
+            points:
+              - [180, 200]
+              - [140, 200]
+              - [145, 175]
+              - [160, 155]
+              - [180, 150]
+              - [200, 155]
+              - [215, 175]
+              - [220, 200]
+        - move_to: { x: 180, y: 200 }
+        - line_to: { x: 200, y: 165, color: 0xF800 }
+        - poly:
+            color: 0xF800
+            points: [[270, 200], [270, 160], [295, 170], [300, 200]]
+        - poly:
+            color: 0x07E0
+            points: [[270, 200], [300, 200], [290, 220], [260, 215]]
+        - text: { x: 8, y: 210, color: 0xFFFF, scale: 1, text: "charts host compose" }

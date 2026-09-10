@@ -35,13 +35,25 @@ typedef enum contract_type {
     CONTRACT_TYPE_BIND_SET = 0x06,
     CONTRACT_TYPE_DRAW_BATCH = 0x07,
     CONTRACT_TYPE_GROUP_DEFINE = 0x08,
-    CONTRACT_TYPE_GROUP_DRAW = 0x09
+    CONTRACT_TYPE_GROUP_DRAW = 0x09,
+    CONTRACT_TYPE_DRAW_POLY = 0x0A,
+    CONTRACT_TYPE_MOVE_TO = 0x0B,
+    CONTRACT_TYPE_LINE_TO = 0x0C,
+    CONTRACT_TYPE_CUBIC_TO = 0x0D
 } contract_type_t;
 
 /** Sub-opcodes inside draw.batch / group.define payloads (reuse type ids). */
 enum {
     CONTRACT_BATCH_OP_FILL = 0x03,
-    CONTRACT_BATCH_OP_TEXT = 0x04
+    CONTRACT_BATCH_OP_TEXT = 0x04,
+    CONTRACT_BATCH_OP_POLY = 0x0A,
+    CONTRACT_BATCH_OP_MOVE_TO = 0x0B,
+    CONTRACT_BATCH_OP_LINE_TO = 0x0C,
+    CONTRACT_BATCH_OP_CUBIC_TO = 0x0D
+};
+
+enum {
+    CONTRACT_POLY_MAX = 16
 };
 
 
@@ -151,10 +163,40 @@ size_t contract_pack_group_define(uint8_t *out, size_t out_cap, uint16_t group,
 size_t contract_pack_group_draw(uint8_t *out, size_t out_cap, uint16_t group,
                                 uint16_t seq);
 
+/** enc = n verts (3..16); color; payload = n×(x:i16,y:i16) LE. */
+size_t contract_pack_poly(uint8_t *out, size_t out_cap, uint16_t id,
+                          uint16_t seq, uint16_t color, uint8_t n,
+                          const int16_t *xy /* n*2 */);
+
+size_t contract_pack_move_to(uint8_t *out, size_t out_cap, uint16_t id,
+                             uint16_t seq, int16_t x, int16_t y);
+
+/** Stroke pen→(x,y) with color; advances pen. */
+size_t contract_pack_line_to(uint8_t *out, size_t out_cap, uint16_t id,
+                             uint16_t seq, int16_t x, int16_t y,
+                             uint16_t color);
+
+/** Cubic from pen through (x1,y1),(x2,y2) to (x3,y3); payload 6×i16; advances pen. */
+size_t contract_pack_cubic_to(uint8_t *out, size_t out_cap, uint16_t id,
+                              uint16_t seq, uint16_t color, int16_t x1,
+                              int16_t y1, int16_t x2, int16_t y2, int16_t x3,
+                              int16_t y3);
+
+size_t contract_batch_put_poly(uint8_t *dst, size_t dst_cap, uint16_t color,
+                               uint8_t n, const int16_t *xy);
+size_t contract_batch_put_move_to(uint8_t *dst, size_t dst_cap, int16_t x,
+                                  int16_t y);
+size_t contract_batch_put_line_to(uint8_t *dst, size_t dst_cap, int16_t x,
+                                  int16_t y, uint16_t color);
+size_t contract_batch_put_cubic_to(uint8_t *dst, size_t dst_cap, uint16_t color,
+                                   int16_t x1, int16_t y1, int16_t x2,
+                                   int16_t y2, int16_t x3, int16_t y3);
+
 /** Execute packed batch ops (fill/text). Used by draw.batch and groups. */
 int contract_apply_batch(const uint8_t *ops, size_t len);
 
 void contract_group_reset(void);
+void contract_pen_reset(void);
 
 #ifdef __cplusplus
 }

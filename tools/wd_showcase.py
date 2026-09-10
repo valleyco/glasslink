@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Flagship product showcase (Step 14 / W19).
+Flagship product showcase (Step 14 / W19; draw stack Steps 19–22).
 
 Beats: color wash → L1 chrome (batch + groups) → live binds → HTTP URI art
-→ dirty-rect motion → finale. Composes wd_mqtt pack/publish helpers.
+→ poly / pen / Bézier / charts → dirty-rect motion → finale.
+Composes wd_mqtt pack/publish helpers + wd_charts recipes.
 
 Examples:
   ./tools/wd_showcase.py --dry-run              # pack + asset only (no broker)
@@ -16,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import http.server
+import json
+import math
 import os
 import socket
 import socketserver
@@ -44,11 +47,82 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wd_charts as charts  # noqa: E402
 import wd_mqtt as wm  # noqa: E402
 
 PANEL_W, PANEL_H = 320, 240
 ART_W, ART_H = 160, 120
 ART_X, ART_Y = 80, 72
+
+
+def sun_poly_ops(cx: int, cy: int, r: int = 18) -> list:
+    """Filled disk (N-gon) + triangle rays — same idea as panel CLEAR icon."""
+    ops: list = []
+    disk = []
+    for i in range(12):
+        a = (2 * math.pi * i) / 12
+        disk.append([int(cx + r * math.cos(a)), int(cy + r * math.sin(a))])
+    ops.append({"poly": {"color": 0xFFE0, "points": disk}})
+    for i in range(8):
+        a = (2 * math.pi * i) / 8
+        tip = [int(cx + (r + 12) * math.cos(a)), int(cy + (r + 12) * math.sin(a))]
+        b1 = [
+            int(cx + (r + 2) * math.cos(a - 0.22)),
+            int(cy + (r + 2) * math.sin(a - 0.22)),
+        ]
+        b2 = [
+            int(cx + (r + 2) * math.cos(a + 0.22)),
+            int(cy + (r + 2) * math.sin(a + 0.22)),
+        ]
+        ops.append({"poly": {"color": 0xFFE0, "points": [tip, b1, b2]}})
+    return ops
+
+
+def draw_stack_batches() -> list[tuple[str, list]]:
+    """Named batch op lists for poly / path / chart beat (each ≤32 ops)."""
+    header = [
+        {"fill": {"x": 0, "y": 0, "w": 320, "h": 240, "color": 0x0011}},
+        {"fill": {"x": 0, "y": 0, "w": 320, "h": 28, "color": 0x0410}},
+        {
+            "text": {
+                "x": 8,
+                "y": 6,
+                "color": 0xFFE0,
+                "scale": 2,
+                "text": "DRAW STACK",
+            }
+        },
+        {"text": {"x": 8, "y": 36, "color": 0x07FF, "scale": 1, "text": "poly"}},
+        *sun_poly_ops(56, 90, 16),
+        {"text": {"x": 120, "y": 36, "color": 0x07FF, "scale": 1, "text": "path"}},
+        {"move_to": {"x": 120, "y": 110}},
+        {
+            "cubic_to": {
+                "x1": 150,
+                "y1": 50,
+                "x2": 190,
+                "y2": 150,
+                "x3": 220,
+                "y3": 70,
+                "color": 0x07E0,
+            }
+        },
+        {"line_to": {"x": 250, "y": 110, "color": 0xF81F}},
+        {
+            "poly": {
+                "color": 0xF800,
+                "points": [[260, 70], [300, 90], [260, 110]],
+            }
+        },
+    ]
+    chart_ops = [
+        {"fill": {"x": 0, "y": 130, "w": 320, "h": 110, "color": 0x0011}},
+        {"text": {"x": 8, "y": 134, "color": 0x07FF, "scale": 1, "text": "charts"}},
+        *charts.bar_graph(8, 152, 100, 70, [0.3, 0.55, 0.8, 0.45, 0.65]),
+        *charts.gauge(180, 210, 40, 0.7),
+        *charts.pie(270, 190, 36, [0.35, 0.25, 0.4]),
+    ]
+    return [("draw poly+path", header), ("draw charts", chart_ops)]
 
 
 def lan_ipv4() -> str:
@@ -74,6 +148,82 @@ def publish(client, devices: list[str], payload: bytes) -> None:
         info.wait_for_publish(timeout=5)
         if not info.is_published():
             raise TimeoutError(f"MQTT publish timeout → {d}")
+
+
+class AckGate:
+    """Serialize host pacing on device apply+ack (critical after FLAG_URI HTTP)."""
+
+    def __init__(self, devices: list[str]) -> None:
+        self.devices = list(devices)
+        self._lock = threading.Lock()
+        self._wait: dict[tuple[str, int, int], threading.Event] = {}
+        self._body: dict[tuple[str, int, int], dict] = {}
+
+    def attach(self, client) -> None:
+        for d in self.devices:
+            client.subscribe(wm.topic_ack(d), qos=0)
+
+        def on_message(_c, _u, msg) -> None:
+            topic = msg.topic
+            try:
+                body = json.loads(msg.payload.decode())
+            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                return
+            try:
+                mid = int(body.get("id", -1))
+                seq = int(body.get("seq", -1))
+            except (TypeError, ValueError):
+                return
+            for d in self.devices:
+                if topic != wm.topic_ack(d):
+                    continue
+                key = (d, mid, seq)
+                with self._lock:
+                    ev = self._wait.get(key)
+                    if ev is None:
+                        return
+                    self._body[key] = body
+                ev.set()
+                return
+
+        client.on_message = on_message
+        time.sleep(0.05)
+
+    def publish(
+        self, client, payload: bytes, *, timeout: float = 5.0, label: str = "",
+        allow_nack: bool = False,
+    ) -> int | None:
+        mid, seq = wm.peek_id_seq(payload)
+        events: list[tuple[tuple[str, int, int], threading.Event]] = []
+        for d in self.devices:
+            key = (d, mid, seq)
+            ev = threading.Event()
+            with self._lock:
+                self._wait[key] = ev
+                self._body.pop(key, None)
+            events.append((key, ev))
+            info = client.publish(wm.topic_cmd(d), payload, qos=1)
+            info.wait_for_publish(timeout=5)
+            if not info.is_published():
+                raise TimeoutError(f"MQTT publish timeout → {d}")
+        last_rc: int | None = None
+        for key, ev in events:
+            if not ev.wait(timeout=timeout):
+                raise TimeoutError(
+                    f"ack timeout {label or 'cmd'} id={mid} seq={seq} device={key[0]}"
+                )
+            with self._lock:
+                body = self._body.pop(key, {})
+                self._wait.pop(key, None)
+            rc = int(body.get("rc", -1))
+            last_rc = rc
+            if rc != 0:
+                msg = f"device nack {label or 'cmd'} rc={rc} id={mid} seq={seq}"
+                if allow_nack:
+                    print(f"  warn: {msg}")
+                else:
+                    raise RuntimeError(msg)
+        return last_rc
 
 
 def bind_topic(client, devices: list[str], slot: int, text: str) -> None:
@@ -211,14 +361,27 @@ def run_showcase(args: argparse.Namespace) -> int:
     )
     seq += 1
 
-    # --- Beat 6: motion strips (prepared templates; positions vary at play) ---
+    # --- Beat 6: poly / pen path / charts (W22–W25) ---
+    for label, ops in draw_stack_batches():
+        add(label, wm.pack_batch(cmd_id, seq, ops))
+        seq += 1
+
+    # --- Beat 7: motion strips (positions vary at play) ---
     # Built at play time.
 
-    # --- Beat 7: finale ---
+    # --- Beat 8: finale ---
     finale_ops = [
         {"fill": {"x": 0, "y": 0, "w": 320, "h": 240, "color": 0x0011}},
         {"text": {"x": 40, "y": 100, "color": 0xFFE0, "scale": 2, "text": "SHOWCASE"}},
-        {"text": {"x": 70, "y": 140, "color": 0x07FF, "scale": 1, "text": "L0+L1+bind+HTTP"}},
+        {
+            "text": {
+                "x": 28,
+                "y": 140,
+                "color": 0x07FF,
+                "scale": 1,
+                "text": "L0+L1+path+charts+HTTP",
+            }
+        },
     ]
     add("finale batch", wm.pack_batch(cmd_id, seq, finale_ops))
     seq += 1
@@ -264,42 +427,54 @@ def run_showcase(args: argparse.Namespace) -> int:
 
         client = wm.mqtt_client(args.host, args.port, f"wd-showcase-{os.getpid()}")
         client.loop_start()
+        gate = AckGate(devices)
+        gate.attach(client)
 
-        # Play beats with pacing (rebuild seq for live path)
+        # Play beats with pacing (rebuild seq for live path).
+        # Always wait for device ack so FLAG_URI HTTP can't race past later beats.
         seq = 1
+
+        def send(
+            payload: bytes,
+            *,
+            timeout: float = 5.0,
+            label: str = "",
+            allow_nack: bool = False,
+        ) -> int | None:
+            return gate.publish(
+                client, payload, timeout=timeout, label=label, allow_nack=allow_nack
+            )
 
         beat("1 color washes")
         for color in (0x0011, 0xF800, 0x07E0, 0x001F, 0x0000):
-            publish(client, devices, wm.pack_clear(cmd_id, seq, color))
+            send(wm.pack_clear(cmd_id, seq, color), label="clear")
             seq += 1
             time.sleep(0.35)
 
         beat("2 L1 batch chrome")
-        publish(client, devices, wm.pack_batch(cmd_id, seq, batch_ops))
+        send(wm.pack_batch(cmd_id, seq, batch_ops), label="batch chrome")
         seq += 1
         time.sleep(pause)
 
         beat("3 group define / clear / redraw")
-        publish(client, devices, wm.pack_group_define(0, seq, group_ops))
+        send(wm.pack_group_define(0, seq, group_ops), label="group define")
         seq += 1
         time.sleep(0.4)
-        publish(client, devices, wm.pack_clear(cmd_id, seq, 0x0000))
+        send(wm.pack_clear(cmd_id, seq, 0x0000), label="clear")
         seq += 1
         time.sleep(0.25)
-        publish(client, devices, wm.pack_group_draw(0, seq))
+        send(wm.pack_group_draw(0, seq), label="group draw")
         seq += 1
         time.sleep(0.35)
-        publish(client, devices, wm.pack_group_draw(0, seq))
+        send(wm.pack_group_draw(0, seq), label="group draw")
         seq += 1
         time.sleep(pause)
 
         beat("4 live binds")
         # Restore chrome under binds
-        publish(client, devices, wm.pack_clear(cmd_id, seq, 0x0011))
+        send(wm.pack_clear(cmd_id, seq, 0x0011), label="clear")
         seq += 1
-        publish(
-            client,
-            devices,
+        send(
             wm.pack_batch(
                 cmd_id,
                 seq,
@@ -316,18 +491,17 @@ def run_showcase(args: argparse.Namespace) -> int:
                     },
                 ],
             ),
+            label="binds chrome",
         )
         seq += 1
-        publish(
-            client,
-            devices,
+        send(
             wm.pack_bind_define(0, seq, 16, 80, 0xFFFF, 0x0011, 2, 10, "--:--"),
+            label="bind0",
         )
         seq += 1
-        publish(
-            client,
-            devices,
+        send(
             wm.pack_bind_define(1, seq, 16, 120, 0x07E0, 0x0011, 2, 10, "temp"),
+            label="bind1",
         )
         seq += 1
         for i in range(8):
@@ -339,17 +513,15 @@ def run_showcase(args: argparse.Namespace) -> int:
             time.sleep(0.45)
 
         beat("5 HTTP URI art")
-        publish(client, devices, wm.pack_clear(cmd_id, seq, 0x0000))
+        send(wm.pack_clear(cmd_id, seq, 0x0000), label="clear")
         seq += 1
-        publish(
-            client,
-            devices,
+        send(
             wm.pack_text(cmd_id, seq, 8, 8, 0xFFFF, "HTTP URI pull", scale=2),
+            label="uri title",
         )
         seq += 1
-        publish(
-            client,
-            devices,
+        print("  waiting for device HTTP GET + paint…")
+        uri_rc = send(
             wm.pack_rect(
                 cmd_id,
                 seq,
@@ -361,40 +533,55 @@ def run_showcase(args: argparse.Namespace) -> int:
                 art_url.encode("utf-8"),
                 flags=wm.FLAG_URI,
             ),
+            timeout=12.0,
+            label="uri art",
+            allow_nack=True,
         )
         seq += 1
-        time.sleep(pause + 0.5)
+        if uri_rc == 0:
+            print("  URI painted — dwell")
+            time.sleep(pause + 0.5)
+        else:
+            print(
+                f"  URI fetch failed (rc={uri_rc}); device was blocked on HTTP — "
+                "continuing so later beats are not raced"
+            )
+            time.sleep(0.4)
 
-        beat("6 dirty-rect motion")
-        publish(client, devices, wm.pack_clear(cmd_id, seq, 0x10A2))
+        beat("6 poly / path / charts")
+        for label, ops in draw_stack_batches():
+            send(wm.pack_batch(cmd_id, seq, ops), label=label)
+            seq += 1
+            time.sleep(max(1.8, pause * 2.0))
+        time.sleep(pause * 0.5)
+
+        beat("7 dirty-rect motion")
+        send(wm.pack_clear(cmd_id, seq, 0x10A2), label="motion clear")
         seq += 1
-        publish(
-            client,
-            devices,
+        send(
             wm.pack_text(cmd_id, seq, 8, 8, 0xFFE0, "MOTION", scale=2),
+            label="motion title",
         )
         seq += 1
         for i in range(24):
             x = 8 + (i * 12) % 280
-            publish(
-                client,
-                devices,
+            send(
                 wm.pack_fill_rect(cmd_id, seq, x, 100, 40, 24, 0x07E0),
+                label="motion fill",
             )
             seq += 1
-            # erase previous trail lightly
             if i > 0:
                 px = 8 + ((i - 1) * 12) % 280
-                publish(
-                    client,
-                    devices,
+                send(
                     wm.pack_fill_rect(cmd_id, seq, px, 100, 40, 24, 0x10A2),
+                    label="motion erase",
                 )
                 seq += 1
             time.sleep(0.06)
 
-        beat("7 finale")
-        publish(client, devices, wm.pack_batch(cmd_id, seq, finale_ops))
+        time.sleep(pause * 0.6)
+        beat("8 finale")
+        send(wm.pack_batch(cmd_id, seq, finale_ops), label="finale")
         seq += 1
         time.sleep(pause)
 
