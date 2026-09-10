@@ -13,8 +13,7 @@ CPPFLAGS := \
 
 CODEC_SRCS := \
 	$(ROOT)/components/codec/src/codec.c \
-	$(ROOT)/components/codec/src/codec_raw.c \
-	$(ROOT)/components/codec/src/codec_delta_rle.c
+	$(ROOT)/components/codec/src/codec_raw.c
 
 PARSE_SRCS := $(ROOT)/components/contract/src/contract_parse.c
 APPLY_SRCS := $(ROOT)/components/contract/src/contract_apply.c

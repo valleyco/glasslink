@@ -129,8 +129,8 @@ def make_banner(text: str, w: int = 320, h: int = 28, bg=(0, 40, 80), fg=(255, 2
 
 
 def encode_auto(w: int, h: int, raw: bytes) -> tuple[int, bytes]:
-    chosen, payload = wm.encode_rgb("auto", w, h, raw)
-    return wm.enc_id(chosen), payload
+    """Product: raw only (delta lab is ../delta-rle-lab)."""
+    return wm.ENC_RAW, raw
 
 
 def tile_and_publish(
@@ -277,7 +277,7 @@ def run_demo(args: argparse.Namespace) -> int:
             seq = tile_and_publish(client, args.device, x, y, w, h, raw, seq)
             time.sleep(args.pause + 0.5)
 
-        print("== finale: delta UI panel-ish ==")
+        print("== finale: raw UI panel-ish ==")
         publish(client, args.device, wm.pack_clear(1, seq, 0x10A2))
         seq += 1
         for box in (

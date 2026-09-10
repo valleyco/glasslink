@@ -17,7 +17,6 @@ SRCS := \
 	$(ROOT)/components/contract/src/contract_apply.c \
 	$(ROOT)/components/codec/src/codec.c \
 	$(ROOT)/components/codec/src/codec_raw.c \
-	$(ROOT)/components/codec/src/codec_delta_rle.c \
 	$(ROOT)/components/render/src/render.c \
 	$(ROOT)/host/fake_display/fake_display.c
 

@@ -119,14 +119,14 @@ No production feature lands without a failing host test written first (except pu
 | **W18** | Heap / fragmentation | Step **13**: no residual malloc in delta decode; static HTTP RX pool; `heap_free`/`heap_largest` on status. | **done** |
 | **W19** | Showcase demo | After feature set is in place (not before): one **full** host-driven demo that exercises the product end-to-end on glass (and SDL). Builds on `wd_demo` / `wd_scene` — not a new stack. | **agreed** |
 | **W20** | L1 batch + groups (B1) | **draw.batch** + **group** slots (define/draw). No CBOR/LVGL; fill+text sub-ops only. | **done** |
-| **W21** | Delta codec exit | Product path is L1 + raw/HTTP; **`delta_rle_v1` scheduled for removal**. Preserve work in a **separate lab repo** first (host codec + benches + docs), then strip from wl-display (device keeps `enc=0` raw only). | **agreed** |
+| **W21** | Delta codec exit | Lab extract (Step 16) + **removed from product** (Step 17): wire `enc=0` raw only. | **done** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–13, 15–16 done**. Flash deferred for glass QA.
-**Next:** **Step 17** (W21 remove delta from product) on `go`; glass QA when board free; Step 14 showcase when ready.
+Steps **0–13, 15–17 done**. Flash deferred for glass QA.
+**Next:** glass QA when board free; **Step 14 showcase** when ready; other backlog.
 
 
 ---
@@ -413,21 +413,18 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 **Status:** `done` · **Decision:** W21  
 
 **Lab:** [`../delta-rle-lab`](../delta-rle-lab) (`/home/davidl/Projects/delta-rle-lab`) — host `make test` / `make bench` green.  
-Copied: `components/codec`, `host/codec` (+ corpus), benches, `delta_rle_v1.md`, codec-harness. wl-display still ships delta until Step 17.
+Copied: `components/codec`, `host/codec` (+ corpus), benches, `delta_rle_v1.md`, codec-harness. Product stripped of delta in Step 17.
 
 **Done when:** new repo builds `make test` / `make bench`; wl-display still unchanged. ✓
 
 ---
 
 ### Step 17 — Remove delta from wl-display (W21)
-**Status:** `todo` · **Depends on:** Step 16 · **Decision:** W21  
-**Do not start until explicit `go`.**
+**Status:** `done` · **Depends on:** Step 16 · **Decision:** W21  
 
-Product wire: **`enc=0` raw only** for `raster.rect` (inline + URI). Drop delta encode/decode from firmware and tools defaults; update status `codecs`, contract docs, scenes that force delta. Keep L0 raw for rare bitmaps / HTTP bodies.
+Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; status `codecs:["raw_rgb565"]`. Lab: [`../delta-rle-lab`](../delta-rle-lab).
 
-**Out of scope:** inventing a replacement compressor in-tree (lives in the lab).
-
-**Done when:** host tests green without delta suite; IDF builds; docs say raw-only; pointer to lab repo in README/PLAN.
+**Done when:** host tests green without delta suite; IDF builds; docs raw-only; lab pointer. ✓
 
 ---
 
@@ -442,7 +439,7 @@ Product wire: **`enc=0` raw only** for `raster.rect` (inline + URI). Drop delta 
 | B5 | Image sequence / P-frame compression |
 | B6 | Huffman / YUV plane modes on delta_rle → **lab repo** (Step 16), not product |
 | B-codec-lab | Extract delta_rle lab — **done** Step 16 → `../delta-rle-lab` |
-| B-codec-drop | Remove delta from wl-display — **Step 17** (W21; after 16) |
+| B-codec-drop | Remove delta from wl-display — **done** Step 17 |
 | B7 | Shared HAL component repo (if copy drifts) |
 | B8 | OTA |
 | B9 | Home Assistant discovery flavor |
@@ -516,4 +513,4 @@ make build flash monitor   # IDF device (later)
 5. Step 13 (W18 heap) — **done** (host + IDF build; glass heap measure when flashable).
 6. Showcase demo (W19 / Step 14 / B-showcase) — **after** features; wait for explicit `go`.
 7. B1 draw.batch + groups (W20 / Step 15) — **done**.
-8. Delta exit (W21): Step **16** lab extract — **done** (`../delta-rle-lab`); Step **17** remove from product — wait for `go`.
+8. Delta exit (W21): Steps **16–17** **done** (lab `../delta-rle-lab`; product raw-only).

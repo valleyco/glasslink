@@ -3,7 +3,7 @@
  * Links fake_display + contract + codec + render (no IDF).
  *
  * Modes:
- *   --demo              scripted clear / raw / delta rects
+ *   --demo              scripted clear / raw rects
  *   --apply file.bin…   dispatch each envelope, then hold
  *   --stdin             length-prefixed envelopes from stdin (u32 LE + bytes)
  *
@@ -158,8 +158,8 @@ typedef enum {
     DEMO_CLEAR_RED = 0,
     DEMO_CLEAR_BLACK,
     DEMO_RAW_GREEN,
-    DEMO_DELTA_BLUE,
-    DEMO_DELTA_CHECKER,
+    DEMO_RAW_BLUE,
+    DEMO_RAW_CHECKER,
     DEMO_BARS,
     DEMO_COUNT
 } demo_step_t;
@@ -176,13 +176,13 @@ static int demo_run_step(int step)
     case DEMO_RAW_GREEN:
         fill_rgb(rgb, 40, 30, 0x07E0);
         return pack_and_dispatch_rect(20, 30, 40, 30, CODEC_ENC_RAW_RGB565, rgb);
-    case DEMO_DELTA_BLUE:
+    case DEMO_RAW_BLUE:
         fill_rgb(rgb, 48, 24, 0x001F);
-        return pack_and_dispatch_rect(200, 160, 48, 24, CODEC_ENC_DELTA_RLE_V1,
+        return pack_and_dispatch_rect(200, 160, 48, 24, CODEC_ENC_RAW_RGB565,
                                       rgb);
-    case DEMO_DELTA_CHECKER:
+    case DEMO_RAW_CHECKER:
         checker_rgb(rgb, 32, 24, 0xF800, 0xFFFF);
-        return pack_and_dispatch_rect(120, 80, 32, 24, CODEC_ENC_DELTA_RLE_V1,
+        return pack_and_dispatch_rect(120, 80, 32, 24, CODEC_ENC_RAW_RGB565,
                                       rgb);
     case DEMO_BARS: {
         static const uint16_t cols[3] = {0xF800, 0x07E0, 0x001F};

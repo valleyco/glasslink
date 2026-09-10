@@ -1,7 +1,7 @@
 # esp32-wl-display
 
 Wireless **thin-client** display on an ESP32 CYD (ESP32-2432S028R, ST7789 320×240).  
-A host sends **L0** commands over **MQTT** (binary envelopes): `display.clear` and compressed/raw `raster.rect`. No touch / LVGL / TLS in v1.
+A host sends **L0** commands over **MQTT** (binary envelopes): `display.clear` and raw `raster.rect` (plus L1 chrome). No touch / LVGL / TLS in v1.
 
 Living plan: [`PLAN.md`](PLAN.md) · Intent: [`goal.md`](goal.md)
 
@@ -88,7 +88,7 @@ Encode → serve on LAN → MQTT carries URL only (`FLAG_URI`):
 
 ```bash
 mkdir -p tools/.cache/http
-./tools/wd_mqtt.py asset --w 160 --h 120 --pattern checker --enc auto \
+./tools/wd_mqtt.py asset --w 160 --h 120 --pattern checker --enc raw \
   --out tools/.cache/http/panel.bin
 # in another terminal (use a directory the device can GET):
 python3 -m http.server 8000 --directory tools/.cache/http
@@ -117,8 +117,8 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0x001F --wait-ack
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0xF800
 ./tools/wd_mqtt.py inject rect --device cyd1 --solid 0x07E0 --w 48 --h 32 --x 20 --y 40
-# default --enc auto (delta for UI; raw for noise/photos)
-# large photos: asset --enc auto + inject rect --uri http://… (not MQTT tiles)
+# product: --enc raw only (delta experiments → ../delta-rle-lab)
+# large photos: asset --enc raw + inject rect --uri http://…
 ```
 
 ---
@@ -127,7 +127,7 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 
 | Path | Role |
 |------|------|
-| `components/codec` | raw + `delta_rle_v1` (frozen) |
+| `components/codec` | raw RGB565 only (delta → `../delta-rle-lab`) |
 | `components/contract` | binary L0 parse/apply |
 | `components/render` / `board` | blit + ST7789 HAL |
 | `components/wd_net` | Wi-Fi + MQTT + NVS config |
@@ -138,14 +138,14 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 | `tools/scenes/` | example scenes |
 | `docs/contract/` | wire formats + MQTT topics |
 
-Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).  
+Codec notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md) (raw-only; lab link).  
 Flash vs DRAM placement: [`docs/memory-placement.md`](docs/memory-placement.md) (`make audit-mem` after `build-mqtt`).
 
 ---
 
 ## v1 scope
 
-**In:** L0 raster + clear, L1 fill/text/batch + groups, binds, MQTT inline + `FLAG_URI` HTTP, codecs, host TDD, LAN plaintext MQTT.
+**In:** L0 raw raster + clear, L1 fill/text/batch + groups, binds, MQTT inline + `FLAG_URI` HTTP, host TDD, LAN plaintext MQTT.
 **Out:** CBOR, touch, TLS, LVGL, value binds (see backlog in `PLAN.md`).
 
 ---

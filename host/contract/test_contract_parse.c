@@ -70,7 +70,7 @@ static void test_parse_uri_rect(void)
     uint8_t buf[128];
     contract_msg_t m;
     size_t n = contract_pack_rect_flags(
-        buf, sizeof(buf), 1, 2, 10, 20, 8, 8, CODEC_ENC_DELTA_RLE_V1,
+        buf, sizeof(buf), 1, 2, 10, 20, 8, 8, CODEC_ENC_RAW_RGB565,
         CONTRACT_FLAG_URI, (const uint8_t *)url, (uint32_t)strlen(url));
     ASSERT_TRUE(n == CONTRACT_HDR_SIZE + strlen(url));
     ASSERT_EQ_INT(CONTRACT_OK, contract_parse(buf, n, &m));

@@ -7,7 +7,7 @@ Uses local broker by default (127.0.0.1:1883). Binary L0 envelope = docs/contrac
 Examples:
   ./tools/wd_mqtt.py inject clear --device dev1 --color 0xF800
   ./tools/wd_mqtt.py inject rect --device dev1 --x 10 --y 20 --w 8 --h 8
-  ./tools/wd_mqtt.py inject rect --device dev1 --enc delta --solid 0x07E0 --w 32 --h 16
+  ./tools/wd_mqtt.py inject rect --device dev1 --solid 0x07E0 --w 32 --h 16
   ./tools/wd_mqtt.py inject rect --device dev1 --pattern checker --w 16 --h 8
   ./tools/wd_mqtt.py inject rect --device dev1 --rgb-file pixels.rgb --w 8 --h 8 --enc raw
   ./tools/wd_mqtt.py sim --device dev1 --apply ./host/mqtt/apply_bin
@@ -57,7 +57,6 @@ TYPE_BATCH = 0x07
 TYPE_GROUP_DEFINE = 0x08
 TYPE_GROUP_DRAW = 0x09
 ENC_RAW = 0
-ENC_DELTA = 1
 FMT_RGB565 = 0
 FLAG_URI = 1 << 0
 INLINE_MAX = 6144  # docs/contract/mqtt-topics-v1.md
@@ -432,32 +431,26 @@ def ensure_encode_rect() -> Path:
 
 
 def encode_rgb(enc_name: str, w: int, h: int, raw: bytes) -> tuple[str, bytes]:
-    """Encode raw RGB565 LE pixels via host encode_rect CLI.
-
-    Returns (chosen_enc_name, payload). For enc_name 'auto', chosen is 'raw' or 'delta'.
-    """
+    """Encode raw RGB565 LE via host encode_rect (product: raw only)."""
     need = w * h * 2
     if len(raw) != need:
         raise ValueError(f"rgb size {len(raw)} != {need} for {w}x{h}")
+    if enc_name not in ("raw", "auto"):
+        raise ValueError("product tools: only raw (delta → ../delta-rle-lab)")
     enc_bin = ensure_encode_rect()
     r = subprocess.run(
-        [str(enc_bin), "--enc", enc_name, "--w", str(w), "--h", str(h)],
+        [str(enc_bin), "--enc", "raw", "--w", str(w), "--h", str(h)],
         input=raw,
         capture_output=True,
         check=True,
     )
-    chosen = enc_name
-    if enc_name == "auto":
-        # stderr: enc=raw|delta
-        for line in r.stderr.decode().splitlines():
-            if line.startswith("enc="):
-                chosen = line.split("=", 1)[1].strip()
-                break
-    return chosen, r.stdout
+    return "raw", r.stdout
 
 
 def enc_id(name: str) -> int:
-    return ENC_DELTA if name == "delta" else ENC_RAW
+    if name == "delta":
+        raise ValueError("delta removed from product (see ../delta-rle-lab)")
+    return ENC_RAW
 
 
 def build_rect_payload(args: argparse.Namespace) -> tuple[int, bytes]:
@@ -480,12 +473,9 @@ def build_rect_payload(args: argparse.Namespace) -> tuple[int, bytes]:
     else:
         raw = rgb565_fill(args.w, args.h, args.solid)
 
-    if enc_name == "raw":
+    if enc_name in ("raw", "auto"):
         return ENC_RAW, raw
-    chosen, data = encode_rgb(enc_name if enc_name != "delta" else "delta", args.w, args.h, raw)
-    if enc_name == "delta":
-        return ENC_DELTA, data
-    return enc_id(chosen), data
+    raise ValueError("product tools: only --enc raw|auto (delta → ../delta-rle-lab)")
 
 
 def check_inline_max(msg: bytes, *, enforce: bool) -> None:
@@ -578,9 +568,9 @@ def cmd_inject(args: argparse.Namespace) -> int:
                 if len(uri) > 256:
                     raise ValueError("URI longer than CONTRACT_URI_MAX (256)")
                 enc_name = args.enc
-                if enc_name == "auto":
-                    raise ValueError("--uri requires --enc raw or delta (body is pre-encoded)")
-                enc = ENC_RAW if enc_name == "raw" else ENC_DELTA
+                if enc_name not in ("raw",):
+                    raise ValueError("--uri requires --enc raw (body is pre-encoded raw)")
+                enc = ENC_RAW
                 payload = pack_rect(
                     args.id,
                     args.seq,
@@ -713,7 +703,7 @@ def cmd_visual(args: argparse.Namespace) -> int:
     c.publish(topic_lwt(args.device), b"online", qos=1, retain=True)
     c.publish(
         topic_status(args.device),
-        b'{"fw":"host-sdl-sim","disp":{"w":320,"h":240},"inline_max":6144,"codecs":["raw","delta_rle_v1"]}',
+        b'{"fw":"host-sdl-sim","disp":{"w":320,"h":240},"inline_max":6144,"codecs":["raw_rgb565"]}',
         qos=1,
         retain=True,
     )
@@ -770,7 +760,7 @@ def cmd_sim(args: argparse.Namespace) -> int:
     c.publish(topic_lwt(args.device), b"online", qos=1, retain=True)
     c.publish(
         topic_status(args.device),
-        b'{"fw":"host-sim","disp":{"w":320,"h":240},"inline_max":6144,"codecs":["raw","delta_rle_v1"]}',
+        b'{"fw":"host-sim","disp":{"w":320,"h":240},"inline_max":6144,"codecs":["raw_rgb565"]}',
         qos=1,
         retain=True,
     )
@@ -794,7 +784,7 @@ def _apply_once(apply_bin: Path, payload: bytes, expect_args: list[str]) -> int:
 
 
 def cmd_loopback(args: argparse.Namespace) -> int:
-    """Broker round-trip: clear, raw rect, delta rect, checker, URI reject."""
+    """Broker round-trip: clear, raw rects, checker, flag reject."""
     subprocess.check_call(["make", "-C", str(ROOT / "host" / "mqtt"), "all"], cwd=ROOT)
     apply_bin = ROOT / "host" / "mqtt" / "apply_bin"
 
@@ -828,27 +818,26 @@ def cmd_loopback(args: argparse.Namespace) -> int:
         )
     )
 
-    # 3) delta solid rect
+    # 3) raw solid rect (was delta)
     dx, dy, dw, dh = 100, 50, 16, 8
-    delta_blue = encode_rgb("delta", dw, dh, rgb565_fill(dw, dh, 0x001F))[1]
+    raw_blue = rgb565_fill(dw, dh, 0x001F)
     cases.append(
         (
-            "delta-rect",
-            pack_rect(3, 3, dx, dy, dw, dh, ENC_DELTA, delta_blue),
+            "raw-rect-blue",
+            pack_rect(3, 3, dx, dy, dw, dh, ENC_RAW, raw_blue),
             ["--expect-px", str(dx), str(dy), "0x001F",
              "--expect-px", str(dx + dw - 1), str(dy + dh - 1), "0x001F"],
         )
     )
 
-    # 4) checker via encode_rect (delta)
+    # 4) checker raw
     cx, cy, cw, ch = 40, 80, 12, 6
     c0, c1 = 0xF800, 0x001F
     checker = rgb565_checker(cw, ch, c0, c1)
-    delta_chk = encode_rgb("delta", cw, ch, checker)[1]
     cases.append(
         (
-            "delta-checker",
-            pack_rect(4, 4, cx, cy, cw, ch, ENC_DELTA, delta_chk),
+            "raw-checker",
+            pack_rect(4, 4, cx, cy, cw, ch, ENC_RAW, checker),
             [
                 "--expect-px", str(cx), str(cy), hex(c0),
                 "--expect-px", str(cx + 1), str(cy), hex(c1),
@@ -1029,9 +1018,9 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--h", type=int, default=8)
     r.add_argument(
         "--enc",
-        choices=("raw", "delta", "auto"),
-        default="auto",
-        help="wire codec (default auto: delta for UI, raw for noise/photos)",
+        choices=("raw", "auto"),
+        default="raw",
+        help="wire codec (product: raw only; auto aliases raw)",
     )
     r.add_argument("--solid", type=lambda s: int(s, 0), default=0xF800)
     r.add_argument(
@@ -1065,7 +1054,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     asset.add_argument("--w", type=int, required=True)
     asset.add_argument("--h", type=int, required=True)
-    asset.add_argument("--enc", choices=("raw", "delta", "auto"), default="auto")
+    asset.add_argument("--enc", choices=("raw", "auto"), default="raw")
     asset.add_argument("--solid", type=lambda s: int(s, 0), default=0xF800)
     asset.add_argument("--pattern", choices=("solid", "checker", "h_runs"), default="solid")
     asset.add_argument("--solid2", type=lambda s: int(s, 0), default=0x001F)

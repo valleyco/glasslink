@@ -21,7 +21,8 @@ Device (ESP-IDF)
 - **Control plane:** MQTT binary commands (L0 + early L1).
 - **Bulk HTTP `uri`:** Step 10-B — `FLAG_URI` + static body pool (`http_max` cap)
 - **Display language:** L0 rects/clear + L1 fill/text/batch + groups (W16/W20) + binds (W17)
-- **Heap:** Step 13 — stream delta decode (no residual malloc); status `heap_free`/`heap_largest`
+- **Heap:** Step 13 — stream/raw decode; static HTTP pool; status `heap_free`/`heap_largest`
+- **Codec:** product **raw only** (W21); delta lab `../delta-rle-lab`
 
 ## Frozen decisions (see PLAN.md)
 
@@ -32,7 +33,7 @@ Device (ESP-IDF)
 | W3/W13 | Copy minimal HAL; shared `hal_display.h` + two link backends |
 | W4 | No touch v1 |
 | W5 | Pure L0 + clear |
-| W6 | raw + delta_rle_v1 (measured) — **exit path W21** (lab then remove) |
+| W6 | raw RGB565 on product; delta_rle → lab (W21) |
 | W7 | Inline MQTT first |
 | W9 | Custom binary header (not CBOR) |
 | W10 | No TLS day one |

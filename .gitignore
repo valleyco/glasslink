@@ -13,10 +13,7 @@ dependencies.lock
 host/mqtt/apply_bin
 host/mqtt/encode_rect
 host/sim/wd-sim
-host/codec/bench_codec
 host/codec/test_codec_raw
-host/codec/test_codec_delta_rle
-host/codec/test_codec_auto
 host/render/test_render_basic
 host/contract/test_contract_parse
 host/contract/test_contract_apply

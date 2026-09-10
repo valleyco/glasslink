@@ -35,7 +35,7 @@ Expert assistant for **esp32-wl-display**: wireless thin-client display on ESP32
 | L0 raster + `display.clear` | L1 draw ops, L2/LVGL, touch |
 | Custom **binary** cmd header | CBOR/JSON on device |
 | MQTT **inline** payloads | HTTP `uri` pull, MQTT chunking |
-| `raw_rgb565` + `delta_rle_v1` | PNG live path; mandatory Huffman/YUV |
+| `raw_rgb565` only | PNG live path; delta_rle (lab) |
 | Host TDD + fake_display | Full RGB565 FB on primary CYD |
 | ESP-IDF + esp-mqtt | Arduino/PlatformIO as primary |
 | LAN, no TLS day one | TLS-required deployment |
@@ -63,7 +63,7 @@ Host tests never link IDF. No IDF headers inside `codec` / `contract` / `render`
 ## Compression
 
 - `raw_rgb565` is required baseline.
-- `delta_rle_v1` is a **measured spike** (goal.md); keep only if benches justify; `enc` enum allows alternatives (QOI/JPEG later).
+- Product L0 raster is **`enc=0` raw only** (W21). Compression experiments live in sibling `delta-rle-lab`.
 
 ## When stuck
 

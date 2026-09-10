@@ -57,11 +57,11 @@ static void draw_via_contract(void)
         for (int i = 0; i < 32 * 16; i++) {
             solid[i] = 0x07FF;
         }
-        if (codec_encode(CODEC_ENC_DELTA_RLE_V1, solid, 32, 16, enc, sizeof(enc),
+        if (codec_encode(CODEC_ENC_RAW_RGB565, solid, 32, 16, enc, sizeof(enc),
                          &elen) == CODEC_OK) {
             uint8_t big[512];
             n = contract_pack_rect(big, sizeof(big), 3, 3, 40, 180, 32, 16,
-                                   CODEC_ENC_DELTA_RLE_V1, enc, (uint32_t)elen);
+                                   CODEC_ENC_RAW_RGB565, enc, (uint32_t)elen);
             if (n) {
                 (void)contract_dispatch(big, n);
             }

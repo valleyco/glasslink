@@ -115,8 +115,7 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
         if (out->fmt != CONTRACT_FMT_RGB565) {
             return CONTRACT_ERR_ARG;
         }
-        if (out->enc != (uint8_t)CODEC_ENC_RAW_RGB565 &&
-            out->enc != (uint8_t)CODEC_ENC_DELTA_RLE_V1) {
+        if (out->enc != (uint8_t)CODEC_ENC_RAW_RGB565) {
             return CONTRACT_ERR_ARG;
         }
         if (flags & CONTRACT_FLAG_URI) {
@@ -125,13 +124,11 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
             }
             break;
         }
-        if (out->enc == (uint8_t)CODEC_ENC_RAW_RGB565) {
+        {
             uint64_t need = (uint64_t)out->w * (uint64_t)out->h * 2ull;
             if (need != (uint64_t)plen) {
                 return CONTRACT_ERR_PAYLOAD;
             }
-        } else if (plen == 0) {
-            return CONTRACT_ERR_PAYLOAD;
         }
         break;
     case CONTRACT_TYPE_FILL_RECT:

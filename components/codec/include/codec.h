@@ -8,9 +8,7 @@ extern "C" {
 #endif
 
 typedef enum codec_enc {
-    CODEC_ENC_RAW_RGB565 = 0,
-    /** Vertical-then-horizontal delta on RGB565, then byte RLE (see codec_delta_rle.c). */
-    CODEC_ENC_DELTA_RLE_V1 = 1
+    CODEC_ENC_RAW_RGB565 = 0
 } codec_enc_t;
 
 enum {
@@ -23,7 +21,7 @@ enum {
 
 /**
  * Encode RGB565 row-major image into out buffer.
- * @return CODEC_OK or negative error; *out_len set on success.
+ * Product wire: raw only (delta_rle lives in ../delta-rle-lab).
  */
 int codec_encode(codec_enc_t enc, const uint16_t *rgb, int w, int h,
                  uint8_t *out, size_t out_cap, size_t *out_len);
@@ -36,8 +34,7 @@ int codec_decode(codec_enc_t enc, int w, int h, const uint8_t *in, size_t in_len
 
 /**
  * Streaming decode: one full row (w pixels) per callback, y = 0..h-1.
- * No heap: stack scratch is two lines of CODEC_MAX_WIDTH (prev + current).
- * Full-frame `codec_decode` is implemented via this path.
+ * Raw path: no heap; rows point into `in`.
  */
 typedef void (*codec_row_fn)(int y, const uint16_t *row, int width, void *ctx);
 
@@ -48,14 +45,6 @@ int codec_decode_rows(codec_enc_t enc, int w, int h, const uint8_t *in,
 
 /** Upper bound on encoded size for worst case (safe buffer sizing). */
 size_t codec_encode_bound(codec_enc_t enc, int w, int h);
-
-/** Prefer delta_rle_v1 for UI-like content; use raw for noise/photos.
- *  Order: sparse unique-color probe → else encode delta → raw if
- *  `delta_len * 100 >= raw_len * 98`.
- *  @param chosen optional; receives the enc actually written.
- */
-int codec_encode_auto(const uint16_t *rgb, int w, int h, uint8_t *out,
-                      size_t out_cap, size_t *out_len, codec_enc_t *chosen);
 
 #ifdef __cplusplus
 }

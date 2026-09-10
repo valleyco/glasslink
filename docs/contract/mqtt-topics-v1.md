@@ -37,7 +37,7 @@ make mqtt-loopback
 # inject
 ./tools/wd_mqtt.py inject clear --device dev1 --color 0xF800
 ./tools/wd_mqtt.py inject rect --device dev1 --x 10 --y 10 --w 16 --h 16 --solid 0x07E0
-./tools/wd_mqtt.py inject rect --device dev1 --pattern checker --enc delta --w 16 --h 8
+./tools/wd_mqtt.py inject rect --device dev1 --pattern checker --enc raw --w 16 --h 8
 ./tools/wd_mqtt.py inject rect --device dev1 --rgb-file pixels.rgb --w 8 --h 8 --enc raw --out cmd.bin
 
 # long-running host simulator (no device flash)
@@ -57,7 +57,7 @@ make sim
 make sim-mqtt
 # other terminal:
 ./tools/wd_mqtt.py inject clear --device sim1 --color 0xF800
-./tools/wd_mqtt.py inject rect --device sim1 --pattern checker --enc delta --w 32 --h 24 --x 40 --y 40
+./tools/wd_mqtt.py inject rect --device sim1 --pattern checker --enc raw --w 32 --h 24 --x 40 --y 40
 ```
 
 Device firmware (`components/wd_net`) uses the same topics once provisioned.

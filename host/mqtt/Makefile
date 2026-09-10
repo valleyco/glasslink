@@ -16,7 +16,6 @@ SRCS_COMMON := \
 	$(ROOT)/components/contract/src/contract_apply.c \
 	$(ROOT)/components/codec/src/codec.c \
 	$(ROOT)/components/codec/src/codec_raw.c \
-	$(ROOT)/components/codec/src/codec_delta_rle.c \
 	$(ROOT)/components/render/src/render.c \
 	$(ROOT)/components/bind/src/bind.c \
 	$(ROOT)/host/fake_display/fake_display.c
@@ -32,12 +31,10 @@ apply_bin: apply_bin.c $(SRCS_COMMON)
 
 encode_rect: encode_rect.c \
 	$(ROOT)/components/codec/src/codec.c \
-	$(ROOT)/components/codec/src/codec_raw.c \
-	$(ROOT)/components/codec/src/codec_delta_rle.c
+	$(ROOT)/components/codec/src/codec_raw.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ encode_rect.c \
 		$(ROOT)/components/codec/src/codec.c \
-		$(ROOT)/components/codec/src/codec_raw.c \
-		$(ROOT)/components/codec/src/codec_delta_rle.c
+		$(ROOT)/components/codec/src/codec_raw.c
 
 test: all
 	@echo "run: make mqtt-loopback (root)"

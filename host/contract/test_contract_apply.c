@@ -47,35 +47,16 @@ static void test_dispatch_rect_raw(void)
     ASSERT_EQ_U16(0x0000, fake_display_get_pixel(9, 20));
 }
 
-static void test_dispatch_rect_delta(void)
+static void test_reject_delta_enc(void)
 {
-    const int w = 8, h = 4;
-    uint16_t src[32];
-    uint8_t enc[256];
-    uint8_t msg[512];
-    size_t elen = 0;
+    uint8_t junk[8] = {0};
+    uint8_t msg[64];
     size_t n;
-    int rc;
-
-    for (int i = 0; i < w * h; i++) {
-        src[i] = (uint16_t)(0x1000 + i * 3);
-    }
-    rc = codec_encode(CODEC_ENC_DELTA_RLE_V1, src, w, h, enc, sizeof(enc),
-                      &elen);
-    ASSERT_EQ_INT(CODEC_OK, rc);
-
-    fake_display_reset();
-    n = contract_pack_rect(msg, sizeof(msg), 5, 6, 3, 4, (uint16_t)w,
-                           (uint16_t)h, CODEC_ENC_DELTA_RLE_V1, enc,
-                           (uint32_t)elen);
+    /* enc=1 no longer accepted (W21) */
+    n = contract_pack_rect(msg, sizeof(msg), 0, 0, 0, 0, 2, 2, 1, junk, 8);
     ASSERT_TRUE(n > 0);
-    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            ASSERT_EQ_U16(src[y * w + x],
-                          fake_display_get_pixel(3 + x, 4 + y));
-        }
-    }
+    fake_display_reset();
+    ASSERT_EQ_INT(CONTRACT_ERR_ARG, contract_dispatch(msg, n));
 }
 
 static void test_clear_then_rect(void)
@@ -99,18 +80,15 @@ static void test_clear_then_rect(void)
     ASSERT_EQ_U16(0x001F, fake_display_get_pixel(10, 10));
 }
 
-static void test_bad_delta_payload(void)
+static void test_bad_raw_payload(void)
 {
     uint8_t junk[4] = {0x01, 0x02, 0x03, 0x04};
     uint8_t msg[64];
     size_t n = contract_pack_rect(msg, sizeof(msg), 0, 0, 0, 0, 4, 4,
-                                  CODEC_ENC_DELTA_RLE_V1, junk, 4);
+                                  CODEC_ENC_RAW_RGB565, junk, 4);
     fake_display_reset();
     ASSERT_TRUE(n > 0);
-    {
-        int rc = contract_dispatch(msg, n);
-        ASSERT_TRUE(rc == CONTRACT_ERR_PAYLOAD || rc == CONTRACT_ERR_TRUNC);
-    }
+    ASSERT_EQ_INT(CONTRACT_ERR_PAYLOAD, contract_dispatch(msg, n));
 }
 
 static uint8_t s_mock_body[64];
@@ -304,9 +282,9 @@ int main(void)
 {
     test_dispatch_clear();
     test_dispatch_rect_raw();
-    test_dispatch_rect_delta();
+    test_reject_delta_enc();
     test_clear_then_rect();
-    test_bad_delta_payload();
+    test_bad_raw_payload();
     test_dispatch_uri_rect();
     test_uri_without_fetch_fails();
     test_dispatch_fill_rect();

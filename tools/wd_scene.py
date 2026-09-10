@@ -83,8 +83,8 @@ def image_to_rgb565(img: Image.Image) -> bytes:
 
 
 def encode_auto(w: int, h: int, raw: bytes) -> tuple[int, bytes]:
-    chosen, payload = wm.encode_rgb("auto", w, h, raw)
-    return wm.enc_id(chosen), payload
+    """Product: raw only (delta lab is ../delta-rle-lab)."""
+    return wm.ENC_RAW, raw
 
 
 def publish(client, device: str, payload: bytes) -> None:
@@ -353,12 +353,12 @@ def run_scene(scene: dict, args: argparse.Namespace) -> int:
                 w = int(body["w"])
                 h = int(body["h"])
                 enc_name = str(body.get("enc", "")).strip()
-                if enc_name not in ("raw", "delta"):
+                if enc_name != "raw":
                     raise ValueError(
-                        "uri needs enc: raw|delta matching the served body "
-                        "(encode with: wd_mqtt.py asset --enc auto)"
+                        "uri needs enc: raw matching the served body "
+                        "(encode with: wd_mqtt.py asset --enc raw)"
                     )
-                enc = wm.ENC_RAW if enc_name == "raw" else wm.ENC_DELTA
+                enc = wm.ENC_RAW
                 msg = wm.pack_rect(
                     cmd_id,
                     seq,
