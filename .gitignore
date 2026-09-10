@@ -33,3 +33,4 @@ sdkconfig.local
 tools/.venv/
 __pycache__/
 *.pyc
+host/bind/test_bind
