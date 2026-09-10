@@ -38,5 +38,5 @@ Encoder must not emit a literal longer than 128 (clamp before writing `c = lit-1
 
 ## Notes
 
-- Encoder may use heap for scratch on host; device path can be tightened later (caller buffers).
-- Streaming decode expands RLE then emits rows via callback (still needs residual buffer of `w*h*2` in current impl — improve in tune phase if needed).
+- Encoder may use heap for scratch (host encode tools).
+- **Decode / `codec_decode_rows`:** no heap — streams RLE into one residual row, undoes predict, then callback. Scratch = two stack lines of `CODEC_MAX_WIDTH`. Full `codec_decode` uses the same path.

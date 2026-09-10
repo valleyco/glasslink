@@ -19,8 +19,9 @@ Device (ESP-IDF)
 ```
 
 - **Control plane:** MQTT binary commands (L0 + early L1).
-- **Bulk HTTP `uri`:** Step 10-B — `FLAG_URI` + device GET (`http_max` cap)
+- **Bulk HTTP `uri`:** Step 10-B — `FLAG_URI` + static body pool (`http_max` cap)
 - **Display language:** L0 rects/clear + L1 `fill_rect` / `draw.text` (W16)
+- **Heap:** Step 13 — stream delta decode (no residual malloc); status `heap_free`/`heap_largest`
 
 ## Frozen decisions (see PLAN.md)
 

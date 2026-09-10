@@ -1,5 +1,5 @@
 /*
- * delta_rle_v1 (initial freeze candidate)
+ * delta_rle_v1 (frozen)
  *
  * Predict (encode forward):
  *   1) Vertical: for y=1..h-1: p[y][x] = rgb[y][x] - rgb[y-1][x]  (uint16 wrap)
@@ -15,6 +15,9 @@
  *   ctrl <  0x80: (ctrl+1) literal bytes follow
  *   ctrl >= 0x80: repeat next byte (ctrl - 0x80 + 1) times
  * Max run/literal length per opcode: 128.
+ *
+ * Device path: decode_rows streams RLE → one residual row → predict → callback.
+ * No malloc(w*h*2) on decode (stack lines ≤ CODEC_MAX_WIDTH).
  */
 
 #include "codec_internal.h"
@@ -23,6 +26,15 @@
 #include <string.h>
 
 enum { RLE_MAX = 128 };
+
+typedef struct {
+    const uint8_t *in;
+    size_t in_len;
+    size_t i;
+    size_t lit_left; /* unread bytes of current literal opcode */
+    size_t run_left; /* unread bytes of current repeat opcode */
+    uint8_t run_byte;
+} rle_reader_t;
 
 static void predict_forward(const uint16_t *rgb, int w, int h, uint16_t *pred)
 {
@@ -119,39 +131,62 @@ static int rle_encode(const uint8_t *in, size_t in_len, uint8_t *out,
     return CODEC_OK;
 }
 
-static int rle_decode(const uint8_t *in, size_t in_len, uint8_t *out,
-                      size_t out_cap, size_t *out_len)
+/** Emit exactly n decoded bytes from the RLE stream into out. */
+static int rle_read(rle_reader_t *r, uint8_t *out, size_t n)
 {
-    size_t i = 0;
     size_t o = 0;
-    while (i < in_len) {
-        uint8_t ctrl = in[i++];
-        if (ctrl < 0x80) {
-            size_t lit = (size_t)ctrl + 1;
-            if (i + lit > in_len) {
+    while (o < n) {
+        if (r->lit_left > 0) {
+            size_t take = r->lit_left;
+            if (take > n - o) {
+                take = n - o;
+            }
+            if (r->i + take > r->in_len) {
                 return CODEC_ERR_TRUNC;
             }
-            if (o + lit > out_cap) {
-                return CODEC_ERR_NOSPACE;
+            memcpy(out + o, r->in + r->i, take);
+            o += take;
+            r->i += take;
+            r->lit_left -= take;
+            continue;
+        }
+        if (r->run_left > 0) {
+            size_t take = r->run_left;
+            if (take > n - o) {
+                take = n - o;
             }
-            memcpy(out + o, in + i, lit);
-            o += lit;
-            i += lit;
-        } else {
-            size_t run = (size_t)(ctrl - 0x80) + 1;
-            if (i >= in_len) {
-                return CODEC_ERR_TRUNC;
+            memset(out + o, r->run_byte, take);
+            o += take;
+            r->run_left -= take;
+            continue;
+        }
+        if (r->i >= r->in_len) {
+            return CODEC_ERR_TRUNC;
+        }
+        {
+            uint8_t ctrl = r->in[r->i++];
+            if (ctrl < 0x80) {
+                size_t lit = (size_t)ctrl + 1;
+                if (r->i + lit > r->in_len) {
+                    return CODEC_ERR_TRUNC;
+                }
+                r->lit_left = lit;
+            } else {
+                size_t run = (size_t)(ctrl - 0x80) + 1;
+                if (r->i >= r->in_len) {
+                    return CODEC_ERR_TRUNC;
+                }
+                r->run_byte = r->in[r->i++];
+                r->run_left = run;
             }
-            uint8_t v = in[i++];
-            if (o + run > out_cap) {
-                return CODEC_ERR_NOSPACE;
-            }
-            memset(out + o, v, run);
-            o += run;
         }
     }
-    *out_len = o;
     return CODEC_OK;
+}
+
+static int rle_reader_done(const rle_reader_t *r)
+{
+    return r->i == r->in_len && r->lit_left == 0 && r->run_left == 0;
 }
 
 size_t codec_delta_rle_bound(int w, int h)
@@ -208,81 +243,60 @@ int codec_delta_rle_encode(const uint16_t *rgb, int w, int h, uint8_t *out,
     return CODEC_OK;
 }
 
+typedef struct {
+    uint16_t *dst;
+    int w;
+} decode_fill_ctx_t;
+
+static void decode_fill_row(int y, const uint16_t *row, int width, void *ctx)
+{
+    decode_fill_ctx_t *c = (decode_fill_ctx_t *)ctx;
+    memcpy(c->dst + (size_t)y * (size_t)c->w, row,
+           (size_t)width * sizeof(uint16_t));
+}
+
 int codec_delta_rle_decode(int w, int h, const uint8_t *in, size_t in_len,
                            uint16_t *rgb_out)
 {
-    size_t raw_bytes;
-    size_t dec_len = 0;
-    uint8_t *raw;
-    int rc;
-
+    decode_fill_ctx_t ctx;
     if (!in || !rgb_out || w <= 0 || h <= 0 || w > CODEC_MAX_WIDTH) {
         return CODEC_ERR_ARG;
     }
-    raw_bytes = (size_t)w * (size_t)h * sizeof(uint16_t);
-    raw = (uint8_t *)malloc(raw_bytes);
-    if (!raw) {
-        return CODEC_ERR_NOSPACE;
-    }
-    rc = rle_decode(in, in_len, raw, raw_bytes, &dec_len);
-    if (rc != CODEC_OK) {
-        free(raw);
-        return rc;
-    }
-    if (dec_len != raw_bytes) {
-        free(raw);
-        return CODEC_ERR_FORMAT;
-    }
-    memcpy(rgb_out, raw, raw_bytes);
-    free(raw);
-
-    for (int y = 0; y < h; y++) {
-        predict_inverse_row_h(rgb_out + y * w, w);
-    }
-    for (int y = 1; y < h; y++) {
-        predict_inverse_v_from_prev(rgb_out + y * w, rgb_out + (y - 1) * w, w,
-                                    y);
-    }
-    return CODEC_OK;
+    ctx.dst = rgb_out;
+    ctx.w = w;
+    return codec_delta_rle_decode_rows(w, h, in, in_len, decode_fill_row, &ctx);
 }
 
 int codec_delta_rle_decode_rows(int w, int h, const uint8_t *in, size_t in_len,
                                 codec_row_fn fn, void *ctx)
 {
-    size_t raw_bytes;
-    size_t dec_len = 0;
-    uint8_t *raw;
-    uint16_t *pred;
+    rle_reader_t r;
     uint16_t prev[CODEC_MAX_WIDTH];
     uint16_t row[CODEC_MAX_WIDTH];
+    size_t row_bytes;
     int rc;
 
     if (!in || !fn || w <= 0 || h <= 0 || w > CODEC_MAX_WIDTH) {
         return CODEC_ERR_ARG;
     }
-    raw_bytes = (size_t)w * (size_t)h * sizeof(uint16_t);
-    raw = (uint8_t *)malloc(raw_bytes);
-    if (!raw) {
-        return CODEC_ERR_NOSPACE;
-    }
-    rc = rle_decode(in, in_len, raw, raw_bytes, &dec_len);
-    if (rc != CODEC_OK) {
-        free(raw);
-        return rc;
-    }
-    if (dec_len != raw_bytes) {
-        free(raw);
-        return CODEC_ERR_FORMAT;
-    }
-    pred = (uint16_t *)(void *)raw;
+
+    memset(&r, 0, sizeof(r));
+    r.in = in;
+    r.in_len = in_len;
+    row_bytes = (size_t)w * sizeof(uint16_t);
 
     for (int y = 0; y < h; y++) {
-        memcpy(row, pred + y * w, (size_t)w * sizeof(uint16_t));
+        rc = rle_read(&r, (uint8_t *)row, row_bytes);
+        if (rc != CODEC_OK) {
+            return rc;
+        }
         predict_inverse_row_h(row, w);
         predict_inverse_v_from_prev(row, y ? prev : NULL, w, y);
         fn(y, row, w, ctx);
-        memcpy(prev, row, (size_t)w * sizeof(uint16_t));
+        memcpy(prev, row, row_bytes);
     }
-    free(raw);
+    if (!rle_reader_done(&r)) {
+        return CODEC_ERR_FORMAT;
+    }
     return CODEC_OK;
 }

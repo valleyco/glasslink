@@ -23,11 +23,15 @@ LAN plaintext MQTT (W10). Device id is a **configured name** (NVS / `CONFIG_WD_D
   "inline_max": 6144,
   "http": true,
   "http_max": 65536,
+  "l1": ["fill_rect", "text"],
+  "bind_slots": 8,
+  "heap_free": 120000,
+  "heap_largest": 90000,
   "codecs": ["raw_rgb565", "delta_rle_v1"]
 }
 ```
 
-Republished on every MQTT `CONNECTED` (covers reconnect).
+`heap_free` / `heap_largest` are live DRAM stats (`esp_get_free_heap_size`, largest 8-bit capable block). Republished on every MQTT `CONNECTED` (covers reconnect).
 
 ## Host tooling
 

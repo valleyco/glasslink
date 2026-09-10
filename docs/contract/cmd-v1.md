@@ -45,7 +45,7 @@ Total message size = `28 + payload_len`.
 ## `raster.rect`
 
 **Inline:** `enc=0` raw (`payload_len == w*h*2`); `enc=1` delta_rle_v1.  
-**URI:** payload = URL (≤256); device GET body = encoded pixels; `http_max` default 65536.
+**URI:** payload = URL (≤256); device GET body = encoded pixels; `http_max` default 65536 (static RX pool — Step 13b).
 
 ## `draw.text`
 

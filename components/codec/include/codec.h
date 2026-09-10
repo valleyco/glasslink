@@ -36,8 +36,8 @@ int codec_decode(codec_enc_t enc, int w, int h, const uint8_t *in, size_t in_len
 
 /**
  * Streaming decode: one full row (w pixels) per callback, y = 0..h-1.
- * Does not allocate a full-frame buffer inside the codec (may use 1–2 line scratch on stack/heap of caller-provided... 
- * actually we use stack lines of max width - document max width).
+ * No heap: stack scratch is two lines of CODEC_MAX_WIDTH (prev + current).
+ * Full-frame `codec_decode` is implemented via this path.
  */
 typedef void (*codec_row_fn)(int y, const uint16_t *row, int width, void *ctx);
 

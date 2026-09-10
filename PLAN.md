@@ -116,12 +116,15 @@ No production feature lands without a failing host test written first (except pu
 | **W15** | Step 10 path | **B-http**: `FLAG_URI` on `raster.rect`; MQTT carries URL; device `esp_http_client` GET → decode → blit. Cap body (no full-FB raw). L1 deferred. | **agreed** |
 | **W16** | Early L1 slice | **fill_rect** + **draw.text** (device 5×7 ASCII bitmap, fg color, no binds yet). No draw.batch / groups / LVGL. Binds = B2 later. | **agreed** |
 | **W17** | Value binds | Hybrid: **bind.define** (geometry once) + live UTF-8 on `wd/{id}/bind/{slot}/set` (and cmd `bind.set`). Erase via stored bg. Max 8 slots. No CBOR. | **agreed** |
+| **W18** | Heap / fragmentation | Step **13**: no residual malloc in delta decode; static HTTP RX pool; `heap_free`/`heap_largest` on status. | **done** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–12 done** (W17 value binds). Flash deferred for glass QA.
+Steps **0–13 done**. Flash deferred for glass QA (11–13 heap stats on device).
+**Next:** glass QA when board free; backlog B1 groups/batch, TLS, …
+
 
 ---
 
@@ -356,6 +359,19 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 
 ---
 
+### Step 13 — Heap / fragmentation harden (B-mem)
+**Status:** `done` · **Depends on:** Step 12 · **Decision:** W18  
+
+| Slice | Intent | Result |
+|-------|--------|--------|
+| 13a | `delta_rle_decode_rows` without `malloc(w*h*2)` | Stream RLE→row predict→callback; stack 2×`CODEC_MAX_WIDTH`. Host +537 asserts. |
+| 13b | Fixed HTTP body buffer | Static `WD_HTTP_MAX_BODY` pool + `wd_http_release` / `contract_set_fetch_release` |
+| 13c | `status` heap fields | `heap_free`, `heap_largest` on retained status (measure after flash) |
+
+**Done when:** host tests prove decode path peak RAM bounded; docs updated; device status exposes heap stats. ✓ (glass measure deferred)
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
@@ -373,6 +389,7 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 | B-cbor | CBOR/generic envelope when L1/bind need it (replace or sit beside binary) |
 | B-s3 | Build/verify profile #2 (S3+PSRAM) when hardware appears |
 | B-demo-text | Demo banner font — **fixed** Step 8a (`wd_text.py`) |
+| B-mem | Heap harden — **done** Step 13 (stream decode, static HTTP pool, status heap) |
 
 ---
 
@@ -390,6 +407,8 @@ From CYD research + invaders experience (order-of-magnitude; **measure on device
 | Arduino-class reports | ~190 KB free (2.x) / ~90 KB (3.x) with UI — IDF will differ; still tight |
 
 v1 success: steady operation **without** PSRAM and **without** full FB after Wi-Fi+MQTT.
+
+**Step 13 (done):** decode_rows streams RLE (no residual `malloc`); HTTP URI uses a fixed static body pool; status advertises `heap_free` / `heap_largest`. Encoder scratch still heap on host. Remaining risk: 64 KiB static HTTP pool + Wi‑Fi/MQTT concurrent pressure — watch `heap_largest` on glass.
 
 ---
 
@@ -422,3 +441,4 @@ make build flash monitor   # IDF device (later)
 2. Device id: **configured name** (NVS / `CONFIG_WD_DEVICE_ID`); host `WD_DEVICE` — **not** MAC suffix in v1 (Step 8c).
 3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
 4. Step 10 path: **B-http** (locked). Step 11 early L1: **W16** (fill_rect + text).
+5. Step 13 (W18 heap) — **done** (host + IDF build; glass heap measure when flashable).

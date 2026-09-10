@@ -130,6 +130,75 @@ static void test_streaming_rows(void)
     ASSERT_TRUE(memcmp(src, dst, sizeof(src)) == 0);
 }
 
+/* Solid frame: one long RLE run spans many row boundaries (Step 13a). */
+static void test_streaming_solid_cross_row_rle(void)
+{
+    const int w = 64, h = 48;
+    uint16_t *src = (uint16_t *)malloc((size_t)w * (size_t)h * sizeof(uint16_t));
+    uint16_t *dst = (uint16_t *)malloc((size_t)w * (size_t)h * sizeof(uint16_t));
+    size_t bound;
+    uint8_t *buf;
+    size_t len = 0;
+    row_ctx_t ctx;
+
+    ASSERT_TRUE(src && dst);
+    for (int i = 0; i < w * h; i++) {
+        src[i] = 0xF800;
+    }
+    bound = codec_encode_bound(CODEC_ENC_DELTA_RLE_V1, w, h);
+    buf = (uint8_t *)malloc(bound);
+    ASSERT_TRUE(buf != NULL);
+    ASSERT_EQ_INT(CODEC_OK, codec_encode(CODEC_ENC_DELTA_RLE_V1, src, w, h, buf,
+                                         bound, &len));
+    ASSERT_TRUE(len < (size_t)w * 4); /* heavily compressed */
+    ctx.w = w;
+    ctx.h = h;
+    ctx.rows_seen = 0;
+    ctx.dst = dst;
+    memset(dst, 0, (size_t)w * (size_t)h * sizeof(uint16_t));
+    ASSERT_EQ_INT(CODEC_OK, codec_decode_rows(CODEC_ENC_DELTA_RLE_V1, w, h, buf,
+                                              len, on_row, &ctx));
+    ASSERT_EQ_INT(h, ctx.rows_seen);
+    ASSERT_TRUE(memcmp(src, dst, (size_t)w * (size_t)h * sizeof(uint16_t)) ==
+                0);
+    free(buf);
+    free(src);
+    free(dst);
+}
+
+static void test_streaming_max_width(void)
+{
+    const int w = CODEC_MAX_WIDTH, h = 2;
+    uint16_t *src = (uint16_t *)malloc((size_t)w * (size_t)h * sizeof(uint16_t));
+    uint16_t *dst = (uint16_t *)malloc((size_t)w * (size_t)h * sizeof(uint16_t));
+    size_t bound;
+    uint8_t *buf;
+    size_t len = 0;
+    row_ctx_t ctx;
+
+    ASSERT_TRUE(src && dst);
+    for (int i = 0; i < w * h; i++) {
+        src[i] = (uint16_t)(i * 13u);
+    }
+    bound = codec_encode_bound(CODEC_ENC_DELTA_RLE_V1, w, h);
+    buf = (uint8_t *)malloc(bound);
+    ASSERT_TRUE(buf != NULL);
+    ASSERT_EQ_INT(CODEC_OK, codec_encode(CODEC_ENC_DELTA_RLE_V1, src, w, h, buf,
+                                         bound, &len));
+    ctx.w = w;
+    ctx.h = h;
+    ctx.rows_seen = 0;
+    ctx.dst = dst;
+    ASSERT_EQ_INT(CODEC_OK, codec_decode_rows(CODEC_ENC_DELTA_RLE_V1, w, h, buf,
+                                              len, on_row, &ctx));
+    ASSERT_EQ_INT(h, ctx.rows_seen);
+    ASSERT_TRUE(memcmp(src, dst, (size_t)w * (size_t)h * sizeof(uint16_t)) ==
+                0);
+    free(buf);
+    free(src);
+    free(dst);
+}
+
 static void test_trunc_stream(void)
 {
     uint16_t src[16];
@@ -197,6 +266,8 @@ int main(void)
     test_odd_sizes();
     test_wraparound();
     test_streaming_rows();
+    test_streaming_solid_cross_row_rle();
+    test_streaming_max_width();
     test_trunc_stream();
     test_fuzz_seeds();
     test_raw_also_roundtrip_same_buf();

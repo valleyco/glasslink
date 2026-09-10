@@ -73,6 +73,7 @@ void wd_net_start(void)
     wifi_start(&cfg);
 
     contract_set_fetch(wd_http_fetch, NULL);
+    contract_set_fetch_release(wd_http_release);
     bind_reset();
 
     wd_mqtt_cfg_t m = {

@@ -12,12 +12,30 @@ typedef struct {
 } row_blit_ctx_t;
 
 static contract_fetch_fn s_fetch;
+static contract_fetch_release_fn s_fetch_release;
 static void *s_fetch_user;
 
 void contract_set_fetch(contract_fetch_fn fn, void *user)
 {
     s_fetch = fn;
     s_fetch_user = user;
+}
+
+void contract_set_fetch_release(contract_fetch_release_fn fn)
+{
+    s_fetch_release = fn;
+}
+
+static void release_fetch_body(uint8_t *body)
+{
+    if (!body) {
+        return;
+    }
+    if (s_fetch_release) {
+        s_fetch_release(body, s_fetch_user);
+    } else {
+        free(body);
+    }
 }
 
 static void blit_row_cb(int y, const uint16_t *row, int width, void *user)
@@ -89,11 +107,11 @@ int contract_apply(const contract_msg_t *msg)
             frc = s_fetch(msg->payload, (size_t)msg->payload_len, &body,
                           &body_len, s_fetch_user);
             if (frc != 0 || !body) {
-                free(body);
+                release_fetch_body(body);
                 return CONTRACT_ERR_FETCH;
             }
             rc = apply_rect_pixels(msg, body, body_len);
-            free(body);
+            release_fetch_body(body);
             return rc;
         }
         return apply_rect_pixels(msg, msg->payload, (size_t)msg->payload_len);

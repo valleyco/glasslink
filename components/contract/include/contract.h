@@ -73,7 +73,11 @@ typedef int (*contract_fetch_fn)(const uint8_t *url, size_t url_len,
                                  uint8_t **body_out, size_t *body_len_out,
                                  void *user);
 
+/** Optional body release; if unset, contract_apply calls free(body). */
+typedef void (*contract_fetch_release_fn)(uint8_t *body, void *user);
+
 void contract_set_fetch(contract_fetch_fn fn, void *user);
+void contract_set_fetch_release(contract_fetch_release_fn fn);
 
 int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out);
 int contract_apply(const contract_msg_t *msg);

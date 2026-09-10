@@ -7,6 +7,7 @@
 
 #include "bind.h"
 #include "contract.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "wd_http.h"
@@ -29,15 +30,19 @@ static volatile bool s_connected;
 
 static void publish_status(void)
 {
-    char body[384];
+    char body[448];
+    size_t heap_free = (size_t)esp_get_free_heap_size();
+    size_t heap_largest =
+        heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     snprintf(body, sizeof(body),
              "{\"fw\":\"wl-display\",\"device_id\":\"%s\","
              "\"disp\":{\"w\":320,\"h\":240},"
              "\"inline_max\":%d,\"http\":true,\"http_max\":%u,"
              "\"l1\":[\"fill_rect\",\"text\"],\"bind_slots\":%d,"
+             "\"heap_free\":%u,\"heap_largest\":%u,"
              "\"codecs\":[\"raw_rgb565\",\"delta_rle_v1\"]}",
              s_device, s_inline_max, (unsigned)wd_http_max_body(),
-             BIND_SLOT_MAX);
+             BIND_SLOT_MAX, (unsigned)heap_free, (unsigned)heap_largest);
     esp_mqtt_client_publish(s_client, s_topic_status, body, 0, 1, 1);
 }
 

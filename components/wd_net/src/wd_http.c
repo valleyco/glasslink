@@ -1,6 +1,6 @@
 /*
- * Thin HTTP GET for FLAG_URI raster.rect (Step 10-B).
- * LAN http:// only (no TLS — W10). Body capped for no-PSRAM heap.
+ * Thin HTTP GET for FLAG_URI raster.rect (Step 10-B / 13b).
+ * LAN http:// only (no TLS — W10). Fixed static body buffer (no malloc churn).
  */
 
 #include "wd_http.h"
@@ -8,7 +8,6 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 static const char *TAG = "wd_http";
@@ -21,9 +20,18 @@ static const char *TAG = "wd_http";
 #define WD_HTTP_TIMEOUT_MS 8000
 #endif
 
+static uint8_t s_body[WD_HTTP_MAX_BODY];
+
 size_t wd_http_max_body(void)
 {
     return (size_t)WD_HTTP_MAX_BODY;
+}
+
+void wd_http_release(uint8_t *body, void *user)
+{
+    (void)body;
+    (void)user;
+    /* static pool — nothing to free */
 }
 
 int wd_http_fetch(const uint8_t *url, size_t url_len, uint8_t **body_out,
@@ -34,7 +42,6 @@ int wd_http_fetch(const uint8_t *url, size_t url_len, uint8_t **body_out,
     esp_http_client_handle_t client;
     int content_len;
     int status;
-    uint8_t *buf = NULL;
     int total = 0;
     int r;
     esp_err_t err;
@@ -96,18 +103,12 @@ int wd_http_fetch(const uint8_t *url, size_t url_len, uint8_t **body_out,
         if (cap > (size_t)WD_HTTP_MAX_BODY) {
             cap = (size_t)WD_HTTP_MAX_BODY;
         }
-        buf = (uint8_t *)malloc(cap);
-        if (!buf) {
-            esp_http_client_close(client);
-            esp_http_client_cleanup(client);
-            return -1;
-        }
 
         while (total < (int)cap) {
-            r = esp_http_client_read(client, (char *)buf + total, (int)cap - total);
+            r = esp_http_client_read(client, (char *)s_body + total,
+                                     (int)cap - total);
             if (r < 0) {
                 ESP_LOGW(TAG, "read err");
-                free(buf);
                 esp_http_client_close(client);
                 esp_http_client_cleanup(client);
                 return -1;
@@ -117,7 +118,6 @@ int wd_http_fetch(const uint8_t *url, size_t url_len, uint8_t **body_out,
             }
             total += r;
             if (total > WD_HTTP_MAX_BODY) {
-                free(buf);
                 esp_http_client_close(client);
                 esp_http_client_cleanup(client);
                 return -1;
@@ -129,12 +129,11 @@ int wd_http_fetch(const uint8_t *url, size_t url_len, uint8_t **body_out,
     esp_http_client_cleanup(client);
 
     if (total <= 0) {
-        free(buf);
         return -1;
     }
 
     ESP_LOGI(TAG, "fetched %d B from %s", total, urlz);
-    *body_out = buf;
+    *body_out = s_body;
     *body_len_out = (size_t)total;
     return 0;
 }
