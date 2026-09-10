@@ -120,14 +120,16 @@ No production feature lands without a failing host test written first (except pu
 | **W19** | Showcase demo | After feature set is in place (not before): one **full** host-driven demo that exercises the product end-to-end on glass (and SDL). Builds on `wd_demo` / `wd_scene` — not a new stack. | **agreed** |
 | **W20** | L1 batch + groups (B1) | **draw.batch** + **group** slots (define/draw). No CBOR/LVGL; fill+text sub-ops only. | **done** |
 | **W21** | Delta codec exit | Lab extract (Step 16) + **removed from product** (Step 17): wire `enc=0` raw only. | **done** |
+| **W22** | L1 filled polygon | **`draw.poly`**: filled convex/simple polygon, capped vertex count (≤16), RGB565 fill. Usable standalone + as **batch/group sub-op**. Driver: better icons (e.g. sun disk + triangle rays). Axis-aligned `fill_rect` stays. Outline-rect / circle = follow-ons if needed. | **agreed** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–17 done**. Panel + showcase host paths ready.
+Steps **0–17 done**. Panel + showcase host paths ready (glass QA in progress).
 **Next milestone:** **Touch upward (B4 → Step 18)** — discuss/lock wire + host hit-test/context, then `go`.  
-Also: glass QA when board free; `make panel-sim` / `showcase-sim` when DISPLAY available.
+**Also locked:** **L1 polygon (W22 / Step 19 / B-poly)** — wait for `go` after or beside touch.  
+Also: `make panel-sim` / `showcase-sim` when useful.
 
 
 ---
@@ -429,6 +431,24 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 
 ---
 
+### Step 19 — L1 filled polygon (W22 / B-poly)
+**Status:** `agreed` · **Depends on:** Step 11+ (render/contract) · **Decision:** W22  
+**Do not start until explicit `go`.**
+
+**Intent:** `draw.poly` — filled polygon for icons/UI (sun disk≈N-gon + triangle rays, chevrons, etc.).
+
+| Slice | Intent |
+|-------|--------|
+| 19a | Host TDD: `render_fill_poly` on fake_display (goldens) |
+| 19b | Contract type + pack/parse; batch/group sub-op |
+| 19c | Tools (`wd_mqtt` / scene) + status caps; optional panel sunny icon upgrade |
+
+**Caps (locked):** ≤ **16** vertices; fill only (no stroke/AA in this step); points int16 panel coords; reject degenerate / oversize payloads.
+
+**Done when:** host tests green; IDF builds; one scene/panel glyph uses poly; docs updated.
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
@@ -438,6 +458,7 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 | B3 | TLS / credentials on device — **declined for LAN product** (W10); revisit only if public-broker threat model |
 | B-wg | WireGuard on device (`esp_wireguard`) — **backlog**; after product polish + measured `heap_free`/`heap_largest` headroom. Prefer gateway WG until then. |
 | B4 | Touch events upward — **next milestone** (Step 18). Device: raw press/move/release + x,y over MQTT. Host: per-device **context** + hit-regions → actions. Reuse invaders touch HAL when on glass. |
+| B-poly | L1 filled polygon (`draw.poly`) — **locked W22 / Step 19**; ≤16 verts; batch/group sub-op; redo panel sun/icons after. Wait for `go`. |
 | B5 | Image sequence / P-frame compression |
 | B6 | Huffman / YUV plane modes on delta_rle → **lab repo** (Step 16), not product |
 | B-codec-lab | Extract delta_rle lab — **done** Step 16 → `../delta-rle-lab` |
@@ -519,3 +540,4 @@ make build flash monitor   # IDF device (later)
 8. Delta exit (W21): Steps **16–17** **done** (lab `../delta-rle-lab`; product raw-only).
 9. WireGuard (**B-wg**): backlog after product + heap headroom; TLS stays out (W10).
 10. **Next milestone:** Touch (**B4** / Step 18) — raw device events; host hit-regions + context (multi-client daemon). Not scheduled until discuss → `go`.
+11. **L1 polygon (W22 / Step 19 / B-poly)** — **agreed**; wait for `go` (filled poly ≤16 verts; batch/group; panel sun).

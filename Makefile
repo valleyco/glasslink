@@ -62,7 +62,7 @@ showcase-sim:
 	tools/.venv/bin/python tools/wd_showcase.py --device sim1 --visual
 
 # Clock + weather panel daemon (docs/plans/weather-clock-panel.md)
-# Live: WD_LAT/WD_LON or --lat/--lon. Offline: --fake. Dry-run: …/wd_panel.py --dry-run
+# Default place: Rehovot, IL (override WD_LAT/WD_LON/WD_PLACE). Offline: --fake.
 panel:
 	$(MAKE) -C host/mqtt all
 	tools/.venv/bin/python tools/wd_panel.py --device $${WD_DEVICE:-cyd1}

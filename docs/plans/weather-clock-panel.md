@@ -36,7 +36,8 @@ Not a one-shot scene; not a replacement for Step 14 showcase.
 
 - **No key.** Example: current weather + WMO weather code + temperature.  
   `https://api.open-meteo.com/v1/forecast?latitude=…&longitude=…&current=temperature_2m,weather_code&timezone=auto`
-- Host flags: `--lat` / `--lon` (defaults: document a sensible home default or require flags; prefer env `WD_LAT` / `WD_LON`).
+- Host flags: `--lat` / `--lon` / `--place` (env `WD_LAT` / `WD_LON` / `WD_PLACE`).  
+  **Default:** Rehovot, Israel (`31.8948`, `34.8113`).
 - **`--fake`:** canned rotating conditions for offline / CI / no network (still runs clock).
 - On-disk cache under `tools/.cache/panel/weather.json` with fetch timestamp; honor `--weather-min` (default **60**).
 - Map WMO codes → small icon set: e.g. `clear`, `cloudy`, `overcast`, `fog`, `drizzle`, `rain`, `snow`, `thunder` (compose each from fills).
@@ -106,14 +107,14 @@ Record findings here while implementing or after first run. Seed list (expected)
 |-----|-------------------------|------|
 | G1 | Host must MQTT time every 1 s | Device **internal clock bind** (NTP/SNTP → auto text) — user interest; product step later |
 | G2 | Only **4** group slots | Many icon variants force redefine-in-place; can’t keep all icons resident |
-| G3 | Batch/group = **fill + text only** | No circle/arc → blocky sun/cloud; no 1px diagonals as first-class |
+| G3 | Batch/group = **fill + text only** | No circle/arc → blocky sun — **mitigation locked:** W22 / Step 19 `draw.poly` |
 | G4 | 5×7 font, scale 1–2 | Large clock is scale-2 bind only (~14 px tall); limited typographic polish |
 | G5 | Bind = **text only** | Can’t bind an icon id; weather icon needs group redefine |
 | G6 | No partial dirty except bind bg | Icon groups start with a 64×64 bg fill to erase prior glyph |
 | G7 | No anti-aliased / bitmap icon in L1 | Could add small raw RGB565 glyph atlas later (L0) if fills look too crude |
-| G8 | Blinking colon via space | `"HH MM SS"` shifts glyph advance vs `:` — slight jitter |
+| G8 | Bind erase flashes glyphs | Mitigated: HH/MM/SS split + static colons; only SS updates each second |
 | G9 | No `°` in 5×7 ASCII | Temp shown as `23.4C` |
-| G10 | Fake demo vs API cadence | `panel-sim` uses `--weather-min 2` so icons rotate; live default remains 60 |
+| G11 | Device has no retained scene | Reboot blanks glass until host re-paints; panel watches `lwt`/`status` → full paint |
 
 Promote any **G\*** into product `PLAN.md` only after explicit agree.
 
@@ -130,6 +131,5 @@ Promote any **G\*** into product `PLAN.md` only after explicit agree.
 
 ## Open (minor — implementer default OK)
 
-- Default lat/lon if env unset (document in `--help`; fail soft to `--fake` or require coords).  
 - Exact RGB565 palette and icon pixel art.  
 - One device vs `--device` repeatable (same as showcase).

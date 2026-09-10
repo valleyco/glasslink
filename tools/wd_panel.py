@@ -7,8 +7,10 @@ Long-running MQTT host: 1 Hz time binds, hourly Open-Meteo (cached), L1 icon gro
 Examples:
   ./tools/wd_panel.py --dry-run --fake
   ./tools/wd_panel.py --device sim1 --visual --fake
+  ./tools/wd_panel.py --device cyd1                 # default: Rehovot, Israel
   ./tools/wd_panel.py --device cyd1 --lat 32.08 --lon 34.78
-  make panel-sim   # fake weather + SDL
+  ./tools/wd_panel.py --fake                        # canned cycle (offline)
+  make panel-sim   # SDL + fake weather
 """
 
 from __future__ import annotations
@@ -59,13 +61,32 @@ COL_FOG = 0xA514
 ICON_X, ICON_Y = 20, 148
 ICON_S = 64
 
-# bind slots
-SLOT_TIME = 0
-SLOT_DATE = 1
-SLOT_TEMP = 2
-SLOT_COND = 3
+# bind slots — HH/MM/SS split so only seconds erase each tick
+SLOT_HH = 0
+SLOT_MM = 1
+SLOT_SS = 2
+SLOT_DATE = 3
+SLOT_TEMP = 4
+SLOT_COND = 5
+
+# scale-2 clock geometry (glyph advance = 6*scale = 12)
+TIME_Y = 48
+TIME_SCALE = 2
+_ADV = 6 * TIME_SCALE  # 12
+TIME_X0 = 112  # HH
+COLON1_X = TIME_X0 + 2 * _ADV
+TIME_X1 = COLON1_X + _ADV  # MM
+COLON2_X = TIME_X1 + 2 * _ADV
+TIME_X2 = COLON2_X + _ADV  # SS
+DATE_X, DATE_Y = 118, 88
+PLACE_Y = 108  # under date
 
 GROUP_ICON = 0
+
+# Default place: Rehovot, Israel (override WD_LAT/WD_LON or --lat/--lon)
+DEFAULT_PLACE = "Rehovot, IL"
+DEFAULT_LAT = 31.8948
+DEFAULT_LON = 34.8113
 
 FAKE_CYCLE = [
     ("clear", 24.0, "CLEAR"),
@@ -170,14 +191,46 @@ def kind_label(kind: str) -> str:
     }.get(kind, "---")[:10]
 
 
-def chrome_ops() -> list:
+def place_display(place: str) -> str:
+    """ASCII label for 5×7 (no fancy commas required)."""
+    s = place.strip() or DEFAULT_PLACE
+    # Prefer "Rehovot IL" style if comma present
+    if "," in s:
+        city, rest = s.split(",", 1)
+        s = f"{city.strip()} {rest.strip()}"
+    return s[:18]
+
+
+def chrome_ops(place: str = DEFAULT_PLACE) -> list:
+    loc = place_display(place)
+    # Center-ish under clock (approx glyph width 6 at scale 1)
+    loc_x = max(8, (320 - len(loc) * 6) // 2)
     return [
         {"fill": {"x": 0, "y": 0, "w": 320, "h": 240, "color": COL_BG}},
         {"fill": {"x": 0, "y": 0, "w": 320, "h": 22, "color": COL_BAR}},
         {"fill": {"x": 0, "y": 22, "w": 320, "h": 2, "color": COL_ACCENT}},
         {"text": {"x": 8, "y": 4, "color": COL_ACCENT, "scale": 1, "text": "wl-panel"}},
+        {
+            "text": {
+                "x": COLON1_X,
+                "y": TIME_Y,
+                "color": COL_ACCENT,
+                "scale": TIME_SCALE,
+                "text": ":",
+            }
+        },
+        {
+            "text": {
+                "x": COLON2_X,
+                "y": TIME_Y,
+                "color": COL_ACCENT,
+                "scale": TIME_SCALE,
+                "text": ":",
+            }
+        },
+        {"text": {"x": loc_x, "y": PLACE_Y, "color": COL_MUTED, "scale": 1, "text": loc}},
         {"fill": {"x": 16, "y": 130, "w": 288, "h": 1, "color": COL_MUTED}},
-        {"text": {"x": 110, "y": 136, "color": COL_MUTED, "scale": 1, "text": "OUTDOOR"}},
+        {"text": {"x": 110, "y": 136, "color": COL_MUTED, "scale": 1, "text": "WEATHER"}},
     ]
 
 
@@ -287,7 +340,7 @@ def refresh_weather(args: argparse.Namespace, state: WeatherState, *, force: boo
                 "lon": args.lon,
             }
         )
-        print(f"weather fetch → {label} {temp:.1f}C")
+        print(f"weather fetch → {label} {temp:.1f}C ({args.place})")
     except (urllib.error.URLError, TimeoutError, KeyError, ValueError, OSError) as e:
         print(f"weather fetch failed: {e}", file=sys.stderr)
         if cached:
@@ -302,11 +355,27 @@ def refresh_weather(args: argparse.Namespace, state: WeatherState, *, force: boo
 
 
 class Panel:
-    def __init__(self, devices: list[str], client: mqtt.Client | None):
+    def __init__(
+        self, devices: list[str], client: mqtt.Client | None, place: str = DEFAULT_PLACE
+    ):
         self.devices = devices
         self.client = client
+        self.place = place
         self.seq = 1
         self._need_full = True
+        self._hh = self._mm = self._ss = self._date = ""
+        self._last_full_mono = 0.0
+        self._last_request_mono = 0.0
+
+    def request_full(self, reason: str = "") -> None:
+        """Queue a full chrome+binds repaint (e.g. device rebooted)."""
+        now = time.monotonic()
+        if self._need_full and (now - self._last_request_mono) < 2.0:
+            return
+        self._need_full = True
+        self._last_request_mono = now
+        if reason:
+            print(f"re-paint queued ({reason})")
 
     def _pub(self, payload: bytes) -> None:
         if self.client is None:
@@ -316,16 +385,26 @@ class Panel:
 
     def paint_full(self, weather: WeatherState) -> None:
         self._pub(wm.pack_clear(1, self.seq, COL_BG))
-        self._pub(wm.pack_batch(1, self.seq, chrome_ops()))
-        # Binds: time / date / temp / condition
+        self._pub(wm.pack_batch(1, self.seq, chrome_ops(self.place)))
+        self._hh = self._mm = self._ss = self._date = ""
         self._pub(
             wm.pack_bind_define(
-                SLOT_TIME, self.seq, 112, 48, COL_ACCENT, COL_BG, 2, 8, "00:00:00"
+                SLOT_HH, self.seq, TIME_X0, TIME_Y, COL_ACCENT, COL_BG, TIME_SCALE, 2, "00"
             )
         )
         self._pub(
             wm.pack_bind_define(
-                SLOT_DATE, self.seq, 118, 88, COL_TEXT, COL_BG, 1, 10, "01/01/1970"
+                SLOT_MM, self.seq, TIME_X1, TIME_Y, COL_ACCENT, COL_BG, TIME_SCALE, 2, "00"
+            )
+        )
+        self._pub(
+            wm.pack_bind_define(
+                SLOT_SS, self.seq, TIME_X2, TIME_Y, COL_ACCENT, COL_BG, TIME_SCALE, 2, "00"
+            )
+        )
+        self._pub(
+            wm.pack_bind_define(
+                SLOT_DATE, self.seq, DATE_X, DATE_Y, COL_TEXT, COL_BG, 1, 10, "01/01/1970"
             )
         )
         self._pub(
@@ -339,7 +418,10 @@ class Panel:
             )
         )
         self.paint_weather(weather, force_icon=True)
+        self.tick_clock(force=True)
         self._need_full = False
+        self._last_full_mono = time.monotonic()
+        print("full paint done")
 
     def paint_weather(self, weather: WeatherState, *, force_icon: bool = False) -> None:
         ops = icon_ops(weather.kind)
@@ -354,26 +436,43 @@ class Panel:
             bind_set(self.client, self.devices, SLOT_COND, weather.label[:10])
         _ = force_icon
 
-    def tick_clock(self, blink: bool) -> None:
+    def tick_clock(self, *, force: bool = False) -> None:
+        """Update only fields that changed (seconds each tick; date once/day)."""
         if self.client is None:
             return
         now = datetime.now()
-        if blink:
-            t = now.strftime("%H %M %S")
-        else:
-            t = now.strftime("%H:%M:%S")
-        bind_set(self.client, self.devices, SLOT_TIME, t)
-        bind_set(self.client, self.devices, SLOT_DATE, now.strftime("%d/%m/%Y"))
+        hh, mm, ss = now.strftime("%H"), now.strftime("%M"), now.strftime("%S")
+        date = now.strftime("%d/%m/%Y")
+        if force or hh != self._hh:
+            bind_set(self.client, self.devices, SLOT_HH, hh)
+            self._hh = hh
+        if force or mm != self._mm:
+            bind_set(self.client, self.devices, SLOT_MM, mm)
+            self._mm = mm
+        if force or ss != self._ss:
+            bind_set(self.client, self.devices, SLOT_SS, ss)
+            self._ss = ss
+        if force or date != self._date:
+            bind_set(self.client, self.devices, SLOT_DATE, date)
+            self._date = date
 
 
 def dry_run() -> int:
     print("== dry-run packs ==")
     msgs = [
         ("clear", wm.pack_clear(1, 1, COL_BG)),
-        ("chrome", wm.pack_batch(1, 2, chrome_ops())),
+        ("chrome", wm.pack_batch(1, 2, chrome_ops(DEFAULT_PLACE))),
         (
-            "bind time",
-            wm.pack_bind_define(0, 3, 112, 48, COL_ACCENT, COL_BG, 2, 8, "00:00:00"),
+            "bind HH",
+            wm.pack_bind_define(
+                SLOT_HH, 3, TIME_X0, TIME_Y, COL_ACCENT, COL_BG, TIME_SCALE, 2, "00"
+            ),
+        ),
+        (
+            "bind SS",
+            wm.pack_bind_define(
+                SLOT_SS, 4, TIME_X2, TIME_Y, COL_ACCENT, COL_BG, TIME_SCALE, 2, "00"
+            ),
         ),
     ]
     for kind, _, _ in FAKE_CYCLE:
@@ -399,13 +498,12 @@ def run(args: argparse.Namespace) -> int:
     devices = [str(d) for d in devices]
 
     use_fake = bool(args.fake)
-    if args.lat is None or args.lon is None:
-        if not use_fake:
-            print(
-                "no --lat/--lon (or WD_LAT/WD_LON); using --fake weather",
-                file=sys.stderr,
-            )
-            use_fake = True
+    if args.lat is None:
+        args.lat = DEFAULT_LAT
+    if args.lon is None:
+        args.lon = DEFAULT_LON
+    if not getattr(args, "place", None):
+        args.place = DEFAULT_PLACE
     args.fake = use_fake
 
     weather = WeatherState()
@@ -440,31 +538,60 @@ def run(args: argparse.Namespace) -> int:
 
     def on_connect(client, userdata, flags, reason_code, properties=None):  # noqa: ARG001
         print(f"MQTT connected rc={reason_code}")
+        for d in devices:
+            client.subscribe(wm.topic_lwt(d), qos=1)
+            client.subscribe(wm.topic_status(d), qos=1)
+            print(f"  watch {wm.topic_lwt(d)} + status")
         p = panel_holder.get("panel")
         if p is not None:
-            p._need_full = True
+            p.request_full("host mqtt connect")
+
+    def on_message(client, userdata, msg):  # noqa: ARG001
+        p = panel_holder.get("panel")
+        if p is None:
+            return
+        topic = msg.topic
+        payload = msg.payload
+        for d in devices:
+            if topic == wm.topic_lwt(d):
+                text = payload.decode("utf-8", errors="replace").strip().lower()
+                if text == "online":
+                    p.request_full(f"{d} lwt online")
+                elif text == "offline":
+                    print(f"{d} offline")
+                return
+            if topic == wm.topic_status(d):
+                # Device republishes retained status on every MQTT CONNECT (reboot)
+                p.request_full(f"{d} status")
+                return
 
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2, client_id=f"wd-panel-{os.getpid()}"
     )
     client.on_connect = on_connect
+    client.on_message = on_message
     client.connect(args.host, args.port, keepalive=30)
     client.loop_start()
 
-    panel = Panel(devices, client)
+    panel = Panel(devices, client, place=str(args.place))
     panel_holder["panel"] = panel
 
     try:
-        blink = False
-        print(f"panel running devices={devices} fake={args.fake} Ctrl+C to stop")
+        print(
+            f"panel running devices={devices} place={args.place} "
+            f"lat={args.lat} lon={args.lon} fake={args.fake} Ctrl+C to stop"
+        )
         while True:
             if panel._need_full:
                 panel.paint_full(weather)
             if refresh_weather(args, weather):
                 panel.paint_weather(weather)
-            panel.tick_clock(blink)
-            blink = not blink
-            time.sleep(1.0)
+            panel.tick_clock()
+            # Align to next wall-clock second (avoids drift / double-tick)
+            delay = 1.0 - (time.time() % 1.0)
+            if delay < 0.05:
+                delay += 1.0
+            time.sleep(delay)
     except KeyboardInterrupt:
         print("\npanel stop")
         return 0
@@ -495,14 +622,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="minutes between weather refreshes (default 60)",
     )
     p.add_argument(
+        "--place",
+        default=os.environ.get("WD_PLACE", DEFAULT_PLACE),
+        help=f"label for logs (default {DEFAULT_PLACE})",
+    )
+    p.add_argument(
         "--lat",
         type=float,
-        default=float(os.environ["WD_LAT"]) if os.environ.get("WD_LAT") else None,
+        default=float(os.environ["WD_LAT"]) if os.environ.get("WD_LAT") else DEFAULT_LAT,
+        help=f"Open-Meteo latitude (default {DEFAULT_LAT} = {DEFAULT_PLACE})",
     )
     p.add_argument(
         "--lon",
         type=float,
-        default=float(os.environ["WD_LON"]) if os.environ.get("WD_LON") else None,
+        default=float(os.environ["WD_LON"]) if os.environ.get("WD_LON") else DEFAULT_LON,
+        help=f"Open-Meteo longitude (default {DEFAULT_LON} = {DEFAULT_PLACE})",
     )
     return p
 

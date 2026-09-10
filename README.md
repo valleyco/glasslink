@@ -43,10 +43,10 @@ Glass HTTP: device must reach this host — set `WD_HTTP_HOST` / `--http-host` t
 **Clock + weather panel** (long-running): dark instrument UI — 1 Hz clock binds, Open-Meteo or `--fake`, L1 icon groups. Plan: [`docs/plans/weather-clock-panel.md`](docs/plans/weather-clock-panel.md).
 
 ```bash
-./tools/wd_panel.py --dry-run --fake
-make panel-sim                            # SDL + fake weather (2 min refresh for demo)
-make panel                                # glass; set WD_LAT/WD_LON for live weather
-# ./tools/wd_panel.py --device cyd1 --lat 32.08 --lon 34.78
+./tools/wd_panel.py --dry-run
+make panel                                # glass; Open-Meteo for Rehovot, IL (default)
+make panel-sim                            # SDL + fake weather (offline demo)
+# override: WD_LAT/WD_LON/WD_PLACE or --lat/--lon/--place
 ```
 
 **Older photo demo** (NASA JPEG tiles over MQTT):
