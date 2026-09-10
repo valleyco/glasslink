@@ -23,6 +23,8 @@ Device (ESP-IDF)
 - **Display language:** L0 rects/clear + L1 fill/text/batch + groups (W16/W20) + binds (W17)
 - **Heap:** Step 13 — stream/raw decode; static HTTP pool; status `heap_free`/`heap_largest`
 - **Codec:** product **raw only** (W21); delta lab `../delta-rle-lab`
+- **Showcase:** Step 14 — `tools/wd_showcase.py` / `make showcase[-sim]` (`--dry-run` OK offline)
+- **Panel:** clock/weather daemon — `tools/wd_panel.py` / `make panel[-sim]` · plan `docs/plans/weather-clock-panel.md`
 
 ## Frozen decisions (see PLAN.md)
 
@@ -36,7 +38,7 @@ Device (ESP-IDF)
 | W6 | raw RGB565 on product; delta_rle → lab (W21) |
 | W7 | Inline MQTT first |
 | W9 | Custom binary header (not CBOR) |
-| W10 | No TLS day one |
+| W10 | No TLS (LAN); WireGuard = backlog B-wg after heap measure |
 | W12 | Host-first TDD |
 
 ## Layout (target)

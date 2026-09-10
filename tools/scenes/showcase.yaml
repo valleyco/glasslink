@@ -1,0 +1,31 @@
+# Step 14 companion — static chrome slice (no live binds / HTTP / motion).
+# Full flagship: ./tools/wd_showcase.py  |  make showcase / showcase-sim
+#
+#   ./tools/wd_scene.py tools/scenes/showcase.yaml --device cyd1
+#   ./tools/wd_scene.py tools/scenes/showcase.yaml --device sim1
+name: showcase
+devices:
+  - cyd1
+defaults:
+  pause: 0.3
+steps:
+  - clear: { color: 0x0011 }
+  - clear: { color: 0xF800 }
+  - clear: { color: 0x07E0 }
+  - clear: { color: 0x0000 }
+  - batch:
+      ops:
+        - fill: { x: 0, y: 0, w: 320, h: 36, color: 0x0410 }
+        - text: { x: 8, y: 10, color: 0xFFE0, scale: 2, text: "wl-display" }
+        - text: { x: 8, y: 68, color: 0xFFFF, scale: 1, text: "showcase yaml slice" }
+  - group_define:
+      group: 0
+      ops:
+        - fill: { x: 8, y: 180, w: 304, h: 48, color: 0x2104 }
+        - text: { x: 16, y: 194, color: 0x07FF, scale: 2, text: "GROUP0" }
+  - sleep: 0.3
+  - clear: { color: 0x0000 }
+  - sleep: 0.2
+  - group_draw: { group: 0 }
+  - sleep: 0.4
+  - group_draw: { group: 0 }

@@ -665,6 +665,51 @@ def write_framed(proc: subprocess.Popen, payload: bytes) -> None:
     proc.stdin.flush()
 
 
+def expand_uri_for_host(msg: bytes) -> list[bytes]:
+    """
+    Host SDL/sim has no HTTP fetch. If envelope is FLAG_URI raster.rect,
+    GET the URL and retile as inline raw strips under INLINE_MAX.
+    Other messages pass through unchanged.
+    """
+    if len(msg) < HDR_SIZE:
+        return [msg]
+    magic, _ver, typ, flags, _pad, id_, seq, x, y, w, h, enc, _fmt, _color, plen = (
+        struct.unpack_from(_HDR, msg, 0)
+    )
+    if magic != MAGIC or typ != TYPE_RECT or not (flags & FLAG_URI):
+        return [msg]
+    if enc != ENC_RAW:
+        raise ValueError("host URI expand: enc must be raw")
+    url = msg[HDR_SIZE : HDR_SIZE + plen].decode("utf-8")
+    if not url.startswith("http://"):
+        raise ValueError(f"host URI expand: bad url {url!r}")
+    import urllib.request
+
+    req = urllib.request.Request(url, headers={"User-Agent": "wd-mqtt-visual/1.0"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        body = r.read()
+    need = int(w) * int(h) * 2
+    if len(body) != need:
+        raise ValueError(f"URI body {len(body)} B != {w}x{h}*2={need}")
+    out: list[bytes] = []
+    row = 0
+    while row < h:
+        strip_h = min(16, h - row)
+        while strip_h >= 1:
+            off = row * w * 2
+            chunk = body[off : off + w * strip_h * 2]
+            tile = pack_rect(id_, seq, x, y + row, w, strip_h, ENC_RAW, chunk)
+            if len(tile) <= INLINE_MAX:
+                break
+            strip_h //= 2
+        else:
+            raise RuntimeError(f"URI expand: cannot fit strip at y={y + row}")
+        out.append(tile)
+        seq = (seq + 1) & 0xFFFF
+        row += strip_h
+    return out
+
+
 def cmd_visual(args: argparse.Namespace) -> int:
     """MQTT subscribe → SDL CYD sim via stdin framing."""
     sim_bin = ROOT / "host" / "sim" / "wd-sim"
@@ -682,8 +727,11 @@ def cmd_visual(args: argparse.Namespace) -> int:
 
     def on_message(client, userdata, msg):  # noqa: ARG001
         try:
-            write_framed(proc, msg.payload)
-            print(f"<< {msg.topic} {len(msg.payload)}B → sim")
+            frames = expand_uri_for_host(msg.payload)
+            for frame in frames:
+                write_framed(proc, frame)
+            tag = f"{len(frames)} tiles" if len(frames) > 1 else "sim"
+            print(f"<< {msg.topic} {len(msg.payload)}B → {tag}")
             id_, seq = peek_id_seq(msg.payload)
             client.publish(
                 topic_ack(args.device),
@@ -696,6 +744,17 @@ def cmd_visual(args: argparse.Namespace) -> int:
         except BrokenPipeError:
             print("sim closed stdin", file=sys.stderr)
             client.disconnect()
+        except Exception as e:  # noqa: BLE001 — keep visual alive; ack fail
+            print(f"visual apply error: {e}", file=sys.stderr)
+            id_, seq = peek_id_seq(msg.payload)
+            client.publish(
+                topic_ack(args.device),
+                json.dumps(
+                    {"rc": 1, "n": len(msg.payload), "id": id_, "seq": seq, "err": str(e)}
+                ).encode(),
+                qos=0,
+                retain=False,
+            )
 
     c = mqtt_client(args.host, args.port, f"wd-visual-{args.device}-{os.getpid()}")
     c.on_message = on_message

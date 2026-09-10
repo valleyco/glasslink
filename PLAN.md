@@ -109,7 +109,7 @@ No production feature lands without a failing host test written first (except pu
 | **W8** | Process | This **PLAN.md** interactive step discipline. | **agreed** |
 | **W12** | **TDD / host tests** | **Host-first TDD**: pure C + gcc; fake_display; red→green→refactor. HAL port may use characterization + lcdtest. Device = integration after green. | **agreed** |
 | **W9** | Envelope format | **Simplest: custom binary L0 header** + raw payload bytes (magic, ver, type, id, geom, enc, len, …). **No CBOR/JSON on device v1.** Host tools may dump hex/JSON for humans. Pixels never base64. Evolve to CBOR when L1/bind need it. | **agreed** |
-| **W10** | TLS day one | **No** — LAN trusted network only until rect path works. | **agreed** |
+| **W10** | TLS day one | **No** — private LAN + Wi‑Fi password; plaintext MQTT/HTTP. TLS stays **out** unless threat model changes. Remote reach → prefer gateway VPN; on-device WireGuard = **B-wg** after heap headroom measured. | **agreed** |
 | **W11** | Broker / buffers | LAN Mosquitto OK. **Raise esp-mqtt buffer** (e.g. 8 KiB); `inline_max` < buffer. Never retain rasters. | **agreed** |
 | **W13** | HAL test seam | **Shared `hal_display.h` + two `.c` backends** (link-time choice). Not vtable/function-pointer inject. | **agreed** |
 | **W14** | Post-v1 order | **A → D → (B or C):** (A) product polish, (D) thin Python scene/host composer, then either **B-http** (bigger pictures) or **L1 start** (fill/text + later binds) — pick at Step 10. No codec-v2 / LVGL until scheduled. | **agreed** |
@@ -125,8 +125,8 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–13, 15–17 done**. Flash deferred for glass QA.
-**Next:** glass QA when board free; **Step 14 showcase** when ready; other backlog.
+Steps **0–17 done** (Step 14 showcase host path ready; glass/SDL eyeball when you can).
+**Next:** glass QA when board free; `make panel-sim` / `make showcase-sim` when DISPLAY available; other backlog.
 
 
 ---
@@ -376,23 +376,23 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 ---
 
 ### Step 14 — Showcase demo (B-showcase)
-**Status:** `todo` · **Depends on:** feature backlog largely done (glass QA + at least L0/L1/binds/HTTP stable) · **Decision:** W19  
-**Do not start until explicit `go`** — this is the *after we have the features* victory lap, not a substitute for missing capabilities.
+**Status:** `done` · **Depends on:** feature backlog largely done · **Decision:** W19  
 
 **Intent:** one **fantastic** end-to-end demo script (host) that feels like a product trailer on CYD (+ SDL):
 
 | Beat | Show |
 |------|------|
 | Boot / clear | Color washes, L0 confidence |
-| UI chrome | `fill_rect` + `draw.text` layout |
-| Live values | Bind slots ticking (clock, fake sensors, MQTT `bind/+/set`) |
-| Big art | HTTP `uri` panels (auto-encoded assets) — not endless MQTT photo tiles |
-| Motion | Dirty-rect animation / scene pacing that reads as intentional |
-| Multi-device | Optional second id if available |
+| UI chrome | `fill_rect` + `draw.text` via `draw.batch` |
+| Groups | define → clear → `group.draw` |
+| Live values | Bind slots ticking (clock + fake temp via `bind/+/set`) |
+| Big art | HTTP `FLAG_URI` panel (`tools/.cache/showcase/panel.bin`) |
+| Motion | Dirty-rect sliding fill |
+| Multi-device | `--device` repeatable |
 
-**Deliverables (when scheduled):** `tools/wd_showcase.py` and/or `tools/scenes/showcase.yaml` + short README “run this”; `make showcase` / `showcase-sim`. Prefer composing existing inject/scene/asset paths over a parallel stack.
+**Deliverables:** [`tools/wd_showcase.py`](tools/wd_showcase.py), [`tools/scenes/showcase.yaml`](tools/scenes/showcase.yaml) (static slice), `make showcase` / `showcase-sim`, `--dry-run`. SDL visual expands URI host-side (`wd_mqtt.expand_uri_for_host`).
 
-**Done when:** one command demos the story on sim and on glass; docs point to it as the flagship path.
+**Done when:** one command demos the story on sim and on glass; docs point to it as the flagship path. ✓ (eyeball deferred — no board / DISPLAY yet)
 
 ---
 
@@ -434,7 +434,8 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 |----|------|
 | B1 | L1 draw.batch + groups — **done** Step 15 (W20) |
 | B2 | MQTT value binds → text slots — **done** Step 12 |
-| B3 | TLS / credentials story (**W10**) |
+| B3 | TLS / credentials on device — **declined for LAN product** (W10); revisit only if public-broker threat model |
+| B-wg | WireGuard on device (`esp_wireguard`) — **backlog**; after product polish + measured `heap_free`/`heap_largest` headroom. Prefer gateway WG until then. |
 | B4 | Touch events upward (reuse invaders touch later) |
 | B5 | Image sequence / P-frame compression |
 | B6 | Huffman / YUV plane modes on delta_rle → **lab repo** (Step 16), not product |
@@ -448,7 +449,7 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 | B-s3 | Build/verify profile #2 (S3+PSRAM) when hardware appears |
 | B-demo-text | Demo banner font — **fixed** Step 8a (`wd_text.py`) |
 | B-mem | Heap harden — **done** Step 13 (stream decode, static HTTP pool, status heap) |
-| B-showcase | Full fantastic demo script — **Step 14** (W19); after features, not instead of them |
+| B-showcase | Full fantastic demo script — **done** Step 14 (W19); eyeball when DISPLAY/board free |
 
 ---
 
@@ -462,7 +463,8 @@ From CYD research + invaders experience (order-of-magnitude; **measure on device
 | Full RGB565 FB | **150 KiB — avoid** |
 | Strip buffers (e.g. 2× 320×8) | ~10 KiB |
 | Wi-Fi + MQTT (plaintext) | tens of KB + RX buffer we choose (e.g. 4–16 KiB) |
-| TLS (if enabled) | often needs ~40 KB **contiguous** — risky on this board |
+| TLS (if enabled) | often needs ~40 KB **contiguous** — **out** (W10); not planned for this board |
+| WireGuard (B-wg) | ballpark +~30–40 KiB flash, modest heap; measure before scheduling |
 | Arduino-class reports | ~190 KB free (2.x) / ~90 KB (3.x) with UI — IDF will differ; still tight |
 
 v1 success: steady operation **without** PSRAM and **without** full FB after Wi-Fi+MQTT.
@@ -511,6 +513,7 @@ make build flash monitor   # IDF device (later)
 3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
 4. Step 10 path: **B-http** (locked). Step 11 early L1: **W16** (fill_rect + text).
 5. Step 13 (W18 heap) — **done** (host + IDF build; glass heap measure when flashable).
-6. Showcase demo (W19 / Step 14 / B-showcase) — **after** features; wait for explicit `go`.
+6. Showcase demo (W19 / Step 14 / B-showcase) — **done** (host `--dry-run` green; SDL/glass eyeball deferred).
 7. B1 draw.batch + groups (W20 / Step 15) — **done**.
 8. Delta exit (W21): Steps **16–17** **done** (lab `../delta-rle-lab`; product raw-only).
+9. WireGuard (**B-wg**): backlog after product + heap headroom; TLS stays out (W10).

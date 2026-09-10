@@ -30,6 +30,27 @@ Broker default: `127.0.0.1:1883` (device must use your PC’s **LAN IP**, e.g. `
 
 ## Demo
 
+**Flagship showcase** (Step 14): color washes → L1 batch/groups → live binds → HTTP URI art → motion.
+
+```bash
+./tools/wd_showcase.py --dry-run          # pack + asset only (no broker)
+make showcase                             # glass (WD_DEVICE=cyd1); needs Mosquitto
+make showcase-sim                         # SDL + local HTTP (URI expanded host-side)
+```
+
+Glass HTTP: device must reach this host — set `WD_HTTP_HOST` / `--http-host` to your LAN IP if auto-detect is wrong.
+
+**Clock + weather panel** (long-running): dark instrument UI — 1 Hz clock binds, Open-Meteo or `--fake`, L1 icon groups. Plan: [`docs/plans/weather-clock-panel.md`](docs/plans/weather-clock-panel.md).
+
+```bash
+./tools/wd_panel.py --dry-run --fake
+make panel-sim                            # SDL + fake weather (2 min refresh for demo)
+make panel                                # glass; set WD_LAT/WD_LON for live weather
+# ./tools/wd_panel.py --device cyd1 --lat 32.08 --lon 34.78
+```
+
+**Older photo demo** (NASA JPEG tiles over MQTT):
+
 **Pre-download originals** (JPEG in `tools/.cache/demo/` — nothing converted yet).  
 **At play time** Python (Pillow) does JPEG→RGB565, tiles under `inline_max`, and orchestrates MQTT.
 
@@ -133,9 +154,11 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 | `components/wd_net` | Wi-Fi + MQTT + NVS config |
 | `host/` | gcc tests, fake_display, SDL sim |
 | `tools/wd_mqtt.py` | inject / loopback / visual |
-| `tools/wd_demo.py` | orchestrated demo |
+| `tools/wd_panel.py` | clock + weather panel daemon |
+| `tools/wd_showcase.py` | Step 14 flagship demo |
+| `tools/wd_demo.py` | orchestrated photo demo |
 | `tools/wd_scene.py` | YAML scene composer |
-| `tools/scenes/` | example scenes |
+| `tools/scenes/` | example scenes (`showcase.yaml`, …) |
 | `docs/contract/` | wire formats + MQTT topics |
 
 Codec notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md) (raw-only; lab link).  

@@ -6,6 +6,7 @@ CPPFLAGS := \
 	-I$(ROOT)/components/contract/include \
 	-I$(ROOT)/components/codec/include \
 	-I$(ROOT)/components/render/include \
+	-I$(ROOT)/components/bind/include \
 	-I$(ROOT)/components/board/include \
 	-I$(ROOT)/host/fake_display
 
@@ -18,6 +19,7 @@ SRCS := \
 	$(ROOT)/components/codec/src/codec.c \
 	$(ROOT)/components/codec/src/codec_raw.c \
 	$(ROOT)/components/render/src/render.c \
+	$(ROOT)/components/bind/src/bind.c \
 	$(ROOT)/host/fake_display/fake_display.c
 
 BIN := wd-sim

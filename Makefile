@@ -4,7 +4,7 @@ IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
 .PHONY: test test-render test-codec test-contract test-bind mqtt-loopback \
-	sim sim-mqtt demo demo-fetch demo-sim scene clean audit-mem \
+	sim sim-mqtt demo demo-fetch demo-sim showcase showcase-sim panel panel-sim scene clean audit-mem \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
@@ -49,6 +49,28 @@ demo-sim:
 	$(MAKE) -C host/sim all
 	$(MAKE) -C host/mqtt all
 	tools/.venv/bin/python tools/wd_demo.py --device sim1 --visual
+
+# Step 14 flagship (W19). Glass: make showcase. SDL: make showcase-sim.
+# Pack-only: tools/.venv/bin/python tools/wd_showcase.py --dry-run
+showcase:
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_showcase.py --device $${WD_DEVICE:-cyd1}
+
+showcase-sim:
+	$(MAKE) -C host/sim all
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_showcase.py --device sim1 --visual
+
+# Clock + weather panel daemon (docs/plans/weather-clock-panel.md)
+# Live: WD_LAT/WD_LON or --lat/--lon. Offline: --fake. Dry-run: …/wd_panel.py --dry-run
+panel:
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_panel.py --device $${WD_DEVICE:-cyd1}
+
+panel-sim:
+	$(MAKE) -C host/sim all
+	$(MAKE) -C host/mqtt all
+	tools/.venv/bin/python tools/wd_panel.py --device sim1 --visual --fake --weather-min 2
 
 # YAML scene composer (Step 9). Override: make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
 SCENE ?= tools/scenes/hello.yaml
