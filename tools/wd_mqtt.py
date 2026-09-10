@@ -53,6 +53,9 @@ TYPE_FILL = 0x03
 TYPE_TEXT = 0x04
 TYPE_BIND_DEFINE = 0x05
 TYPE_BIND_SET = 0x06
+TYPE_BATCH = 0x07
+TYPE_GROUP_DEFINE = 0x08
+TYPE_GROUP_DRAW = 0x09
 ENC_RAW = 0
 ENC_DELTA = 1
 FMT_RGB565 = 0
@@ -60,6 +63,8 @@ FLAG_URI = 1 << 0
 INLINE_MAX = 6144  # docs/contract/mqtt-topics-v1.md
 TEXT_MAX = 64
 BIND_SLOTS = 8
+GROUP_SLOTS = 4
+BATCH_BYTES_MAX = 1024
 
 # LE header: magic[4] ver type flags pad id seq x y w h enc fmt color payload_len
 _HDR = "<4sBBBBHHhhHHBBHI"
@@ -207,6 +212,134 @@ def pack_bind_set(slot: int, seq: int, text: str) -> bytes:
         len(raw),
     )
     return hdr + raw
+
+
+def _parse_color(v) -> int:
+    if isinstance(v, int):
+        return v & 0xFFFF
+    return int(str(v), 0) & 0xFFFF
+
+
+def batch_ops_bytes(ops: list) -> bytes:
+    """Build draw.batch / group.define payload from a list of op dicts."""
+    out = bytearray()
+    if not ops:
+        raise ValueError("batch needs at least one op")
+    if len(ops) > 32:
+        raise ValueError("too many batch ops (max 32)")
+    for item in ops:
+        if not isinstance(item, dict) or len(item) != 1:
+            # also accept {"op":"fill", ...}
+            if isinstance(item, dict) and "op" in item:
+                kind = str(item["op"])
+                body = item
+            else:
+                raise ValueError(f"bad batch op {item!r}")
+        else:
+            kind, body = next(iter(item.items()))
+            if not isinstance(body, dict):
+                raise ValueError(f"bad batch op body {item!r}")
+        kind = str(kind)
+        if kind in ("fill", "fill_rect"):
+            x = int(body["x"])
+            y = int(body["y"])
+            w = int(body["w"])
+            h = int(body["h"])
+            color = _parse_color(body.get("color", 0xF800))
+            if w <= 0 or h <= 0:
+                raise ValueError("fill w/h must be > 0")
+            out += struct.pack("<BhhHHH", TYPE_FILL, x, y, w & 0xFFFF, h & 0xFFFF, color)
+        elif kind == "text":
+            text = str(body["text"])
+            raw = text.encode("utf-8")
+            if not raw or len(raw) > TEXT_MAX:
+                raise ValueError(f"text length must be 1..{TEXT_MAX}")
+            scale = int(body.get("scale", 1))
+            if scale not in (0, 1, 2):
+                raise ValueError("scale must be 0..2")
+            x = int(body["x"])
+            y = int(body["y"])
+            color = _parse_color(body.get("color", 0xFFFF))
+            out += struct.pack(
+                "<BhhHBB", TYPE_TEXT, x, y, color, scale & 0xFF, len(raw)
+            )
+            out += raw
+        else:
+            raise ValueError(f"unknown batch op {kind!r}")
+    if len(out) > BATCH_BYTES_MAX:
+        raise ValueError(f"batch payload {len(out)} > {BATCH_BYTES_MAX}")
+    return bytes(out)
+
+
+def pack_batch(id_: int, seq: int, ops: list) -> bytes:
+    body = batch_ops_bytes(ops)
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_BATCH,
+        0,
+        0,
+        id_ & 0xFFFF,
+        seq & 0xFFFF,
+        0,
+        0,
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        0,
+        len(body),
+    )
+    return hdr + body
+
+
+def pack_group_define(group: int, seq: int, ops: list) -> bytes:
+    if not (0 <= group < GROUP_SLOTS):
+        raise ValueError("group out of range")
+    body = batch_ops_bytes(ops)
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_GROUP_DEFINE,
+        0,
+        0,
+        group & 0xFFFF,
+        seq & 0xFFFF,
+        0,
+        0,
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        0,
+        len(body),
+    )
+    return hdr + body
+
+
+def pack_group_draw(group: int, seq: int) -> bytes:
+    if not (0 <= group < GROUP_SLOTS):
+        raise ValueError("group out of range")
+    return struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_GROUP_DRAW,
+        0,
+        0,
+        group & 0xFFFF,
+        seq & 0xFFFF,
+        0,
+        0,
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        0,
+        0,
+    )
 
 
 def topic_bind_set(device: str, slot: int) -> str:
@@ -419,6 +552,24 @@ def cmd_inject(args: argparse.Namespace) -> int:
                 return 1
             print(f"published {len(raw)} B → {t}")
             return 0
+        elif args.subcmd == "batch":
+            import json
+
+            ops = json.loads(Path(args.ops).read_text())
+            if not isinstance(ops, list):
+                raise ValueError("--ops JSON must be a list")
+            payload = pack_batch(args.id, args.seq, ops)
+            check_inline_max(payload, enforce=True)
+        elif args.subcmd == "group-define":
+            import json
+
+            ops = json.loads(Path(args.ops).read_text())
+            if not isinstance(ops, list):
+                raise ValueError("--ops JSON must be a list")
+            payload = pack_group_define(args.group, args.seq, ops)
+            check_inline_max(payload, enforce=True)
+        elif args.subcmd == "group-draw":
+            payload = pack_group_draw(args.group, args.seq)
         elif args.subcmd == "rect":
             uri = getattr(args, "uri", None)
             if uri:
@@ -852,6 +1003,23 @@ def build_parser() -> argparse.ArgumentParser:
     _inj_common(bp)
     bp.add_argument("--slot", type=int, required=True)
     bp.add_argument("--text", required=True)
+
+    batch = isub.add_parser("batch", help="L1 draw.batch (fill+text ops JSON)")
+    _inj_common(batch)
+    batch.add_argument(
+        "--ops",
+        required=True,
+        help='JSON file: [{"fill":{x,y,w,h,color}},{"text":{x,y,color,scale,text}}]',
+    )
+
+    gd = isub.add_parser("group-define", help="store+draw group batch")
+    _inj_common(gd)
+    gd.add_argument("--group", type=int, required=True)
+    gd.add_argument("--ops", required=True, help="JSON ops file (same as batch)")
+
+    gdr = isub.add_parser("group-draw", help="redraw stored group")
+    _inj_common(gdr)
+    gdr.add_argument("--group", type=int, required=True)
 
     r = isub.add_parser("rect")
     _inj_common(r)

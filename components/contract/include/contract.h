@@ -12,7 +12,10 @@ enum {
     CONTRACT_HDR_SIZE = 28,
     CONTRACT_URI_MAX = 256,
     CONTRACT_TEXT_MAX = 64,
-    CONTRACT_BIND_SLOTS = 8
+    CONTRACT_BIND_SLOTS = 8,
+    CONTRACT_GROUP_SLOTS = 4,
+    CONTRACT_BATCH_BYTES_MAX = 1024,
+    CONTRACT_BATCH_OPS_MAX = 32
 };
 
 /** Wire magic: 'W' 'L' 'D' '1' */
@@ -29,8 +32,18 @@ typedef enum contract_type {
     CONTRACT_TYPE_FILL_RECT = 0x03,
     CONTRACT_TYPE_DRAW_TEXT = 0x04,
     CONTRACT_TYPE_BIND_DEFINE = 0x05,
-    CONTRACT_TYPE_BIND_SET = 0x06
+    CONTRACT_TYPE_BIND_SET = 0x06,
+    CONTRACT_TYPE_DRAW_BATCH = 0x07,
+    CONTRACT_TYPE_GROUP_DEFINE = 0x08,
+    CONTRACT_TYPE_GROUP_DRAW = 0x09
 } contract_type_t;
+
+/** Sub-opcodes inside draw.batch / group.define payloads (reuse type ids). */
+enum {
+    CONTRACT_BATCH_OP_FILL = 0x03,
+    CONTRACT_BATCH_OP_TEXT = 0x04
+};
+
 
 enum {
     CONTRACT_FLAG_URI = 1u << 0
@@ -115,6 +128,33 @@ size_t contract_pack_bind_define(uint8_t *out, size_t out_cap, uint16_t slot,
 /** id = slot. payload = UTF-8 value. */
 size_t contract_pack_bind_set(uint8_t *out, size_t out_cap, uint16_t slot,
                               uint16_t seq, const uint8_t *utf8, uint32_t len);
+
+/** Append fill_rect sub-op to batch buffer. Returns bytes written or 0. */
+size_t contract_batch_put_fill(uint8_t *dst, size_t dst_cap, int16_t x,
+                               int16_t y, uint16_t w, uint16_t h,
+                               uint16_t color);
+
+/** Append text sub-op. Returns bytes written or 0. */
+size_t contract_batch_put_text(uint8_t *dst, size_t dst_cap, int16_t x,
+                               int16_t y, uint16_t color, uint8_t scale,
+                               const uint8_t *utf8, uint8_t len);
+
+size_t contract_pack_batch(uint8_t *out, size_t out_cap, uint16_t id,
+                           uint16_t seq, const uint8_t *ops, uint32_t ops_len);
+
+/** id = group 0..3; payload = batch ops; stores + draws. */
+size_t contract_pack_group_define(uint8_t *out, size_t out_cap, uint16_t group,
+                                  uint16_t seq, const uint8_t *ops,
+                                  uint32_t ops_len);
+
+/** id = group; empty payload; redraws stored batch. */
+size_t contract_pack_group_draw(uint8_t *out, size_t out_cap, uint16_t group,
+                                uint16_t seq);
+
+/** Execute packed batch ops (fill/text). Used by draw.batch and groups. */
+int contract_apply_batch(const uint8_t *ops, size_t len);
+
+void contract_group_reset(void);
 
 #ifdef __cplusplus
 }

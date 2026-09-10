@@ -5,15 +5,23 @@
 #include "render.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     int16_t x;
     int16_t y;
 } row_blit_ctx_t;
 
+typedef struct {
+    uint8_t used;
+    uint16_t len;
+    uint8_t bytes[CONTRACT_BATCH_BYTES_MAX];
+} group_slot_t;
+
 static contract_fetch_fn s_fetch;
 static contract_fetch_release_fn s_fetch_release;
 static void *s_fetch_user;
+static group_slot_t s_groups[CONTRACT_GROUP_SLOTS];
 
 void contract_set_fetch(contract_fetch_fn fn, void *user)
 {
@@ -26,6 +34,11 @@ void contract_set_fetch_release(contract_fetch_release_fn fn)
     s_fetch_release = fn;
 }
 
+void contract_group_reset(void)
+{
+    memset(s_groups, 0, sizeof(s_groups));
+}
+
 static void release_fetch_body(uint8_t *body)
 {
     if (!body) {
@@ -36,6 +49,16 @@ static void release_fetch_body(uint8_t *body)
     } else {
         free(body);
     }
+}
+
+static uint16_t rd_u16(const uint8_t *p)
+{
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static int16_t rd_i16(const uint8_t *p)
+{
+    return (int16_t)rd_u16(p);
 }
 
 static void blit_row_cb(int y, const uint16_t *row, int width, void *user)
@@ -79,6 +102,106 @@ static int apply_rect_pixels(const contract_msg_t *msg, const uint8_t *pix,
         return CONTRACT_ERR_TRUNC;
     }
     return CONTRACT_ERR_PAYLOAD;
+}
+
+int contract_apply_batch(const uint8_t *ops, size_t len)
+{
+    size_t i = 0;
+    unsigned nops = 0;
+
+    if (!ops || len == 0 || len > (size_t)CONTRACT_BATCH_BYTES_MAX) {
+        return CONTRACT_ERR_PAYLOAD;
+    }
+    while (i < len) {
+        uint8_t op;
+        if (nops >= (unsigned)CONTRACT_BATCH_OPS_MAX) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        op = ops[i++];
+        if (op == CONTRACT_BATCH_OP_FILL) {
+            int16_t x, y;
+            uint16_t w, h, color;
+            if (i + 10 > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            x = rd_i16(ops + i);
+            y = rd_i16(ops + i + 2);
+            w = rd_u16(ops + i + 4);
+            h = rd_u16(ops + i + 6);
+            color = rd_u16(ops + i + 8);
+            i += 10;
+            if (w == 0 || h == 0) {
+                return CONTRACT_ERR_ARG;
+            }
+            if (render_fill_rect((int)x, (int)y, (int)w, (int)h, color) != 0) {
+                return CONTRACT_ERR_ARG;
+            }
+        } else if (op == CONTRACT_BATCH_OP_TEXT) {
+            int16_t x, y;
+            uint16_t color;
+            uint8_t scale, tlen;
+            int sc;
+            if (i + 8 > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            x = rd_i16(ops + i);
+            y = rd_i16(ops + i + 2);
+            color = rd_u16(ops + i + 4);
+            scale = ops[i + 6];
+            tlen = ops[i + 7];
+            i += 8;
+            if (tlen == 0 || tlen > (uint8_t)CONTRACT_TEXT_MAX || scale > 2) {
+                return CONTRACT_ERR_ARG;
+            }
+            if (i + (size_t)tlen > len) {
+                return CONTRACT_ERR_TRUNC;
+            }
+            sc = scale ? (int)scale : 1;
+            if (render_draw_text((int)x, (int)y, ops + i, (size_t)tlen, color,
+                                 sc) != 0) {
+                return CONTRACT_ERR_ARG;
+            }
+            i += (size_t)tlen;
+        } else {
+            return CONTRACT_ERR_TYPE;
+        }
+        nops++;
+    }
+    return CONTRACT_OK;
+}
+
+static int group_define_apply(uint8_t gid, const uint8_t *ops, size_t len)
+{
+    group_slot_t *g;
+    int rc;
+    if (gid >= CONTRACT_GROUP_SLOTS) {
+        return CONTRACT_ERR_ARG;
+    }
+    if (!ops || len == 0 || len > (size_t)CONTRACT_BATCH_BYTES_MAX) {
+        return CONTRACT_ERR_PAYLOAD;
+    }
+    rc = contract_apply_batch(ops, len);
+    if (rc != CONTRACT_OK) {
+        return rc;
+    }
+    g = &s_groups[gid];
+    memcpy(g->bytes, ops, len);
+    g->len = (uint16_t)len;
+    g->used = 1;
+    return CONTRACT_OK;
+}
+
+static int group_draw_apply(uint8_t gid)
+{
+    group_slot_t *g;
+    if (gid >= CONTRACT_GROUP_SLOTS) {
+        return CONTRACT_ERR_ARG;
+    }
+    g = &s_groups[gid];
+    if (!g->used || g->len == 0) {
+        return CONTRACT_ERR_ARG;
+    }
+    return contract_apply_batch(g->bytes, (size_t)g->len);
 }
 
 int contract_apply(const contract_msg_t *msg)
@@ -172,6 +295,22 @@ int contract_apply(const contract_msg_t *msg)
         }
         return CONTRACT_ERR_ARG;
     }
+
+    case CONTRACT_TYPE_DRAW_BATCH:
+        if (!msg->payload) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        return contract_apply_batch(msg->payload, (size_t)msg->payload_len);
+
+    case CONTRACT_TYPE_GROUP_DEFINE:
+        if (!msg->payload) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        return group_define_apply((uint8_t)msg->id, msg->payload,
+                                  (size_t)msg->payload_len);
+
+    case CONTRACT_TYPE_GROUP_DRAW:
+        return group_draw_apply((uint8_t)msg->id);
 
     default:
         return CONTRACT_ERR_TYPE;

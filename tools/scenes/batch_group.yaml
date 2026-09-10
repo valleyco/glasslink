@@ -1,0 +1,26 @@
+# Step 15 — draw.batch + group redraw
+#
+#   ./tools/wd_scene.py tools/scenes/batch_group.yaml --device cyd1
+#   ./tools/wd_scene.py tools/scenes/batch_group.yaml --device sim1
+name: batch_group
+devices:
+  - cyd1
+defaults:
+  pause: 0.25
+steps:
+  - clear: { color: 0x0000 }
+  - batch:
+      ops:
+        - fill: { x: 8, y: 8, w: 200, h: 48, color: 0x0010 }
+        - text: { x: 16, y: 16, color: 0xFFE0, scale: 2, text: "BATCH" }
+  - group_define:
+      group: 0
+      ops:
+        - fill: { x: 8, y: 72, w: 180, h: 40, color: 0x2104 }
+        - text: { x: 16, y: 80, color: 0x07FF, scale: 2, text: "GROUP0" }
+  - sleep: 0.4
+  - clear: { color: 0x0000 }
+  - sleep: 0.2
+  - group_draw: { group: 0 }
+  - sleep: 0.5
+  - group_draw: { group: 0 }

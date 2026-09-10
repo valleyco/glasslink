@@ -273,6 +273,29 @@ def run_scene(scene: dict, args: argparse.Namespace) -> int:
                         client, devices, wm.pack_bind_set(slot, seq, text)
                     )
                     seq += 1
+            elif op == "batch":
+                ops = body.get("ops")
+                if not isinstance(ops, list):
+                    raise ValueError("batch needs ops: list")
+                msg = wm.pack_batch(cmd_id, seq, ops)
+                if len(msg) > wm.INLINE_MAX:
+                    raise ValueError(f"batch envelope {len(msg)} > inline_max")
+                publish_all(client, devices, msg)
+                seq += 1
+            elif op in ("group_define", "group-define"):
+                group = int(body["group"])
+                ops = body.get("ops")
+                if not isinstance(ops, list):
+                    raise ValueError("group_define needs ops: list")
+                msg = wm.pack_group_define(group, seq, ops)
+                if len(msg) > wm.INLINE_MAX:
+                    raise ValueError(f"group envelope {len(msg)} > inline_max")
+                publish_all(client, devices, msg)
+                seq += 1
+            elif op in ("group_draw", "group-draw"):
+                group = int(body["group"])
+                publish_all(client, devices, wm.pack_group_draw(group, seq))
+                seq += 1
             elif op == "checker":
                 x = int(body.get("x", 0))
                 y = int(body.get("y", 0))

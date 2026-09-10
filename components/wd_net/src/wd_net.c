@@ -75,6 +75,7 @@ void wd_net_start(void)
     contract_set_fetch(wd_http_fetch, NULL);
     contract_set_fetch_release(wd_http_release);
     bind_reset();
+    contract_group_reset();
 
     wd_mqtt_cfg_t m = {
         .uri = cfg.mqtt_uri,

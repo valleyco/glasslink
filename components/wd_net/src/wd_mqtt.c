@@ -38,11 +38,12 @@ static void publish_status(void)
              "{\"fw\":\"wl-display\",\"device_id\":\"%s\","
              "\"disp\":{\"w\":320,\"h\":240},"
              "\"inline_max\":%d,\"http\":true,\"http_max\":%u,"
-             "\"l1\":[\"fill_rect\",\"text\"],\"bind_slots\":%d,"
-             "\"heap_free\":%u,\"heap_largest\":%u,"
+             "\"l1\":[\"fill_rect\",\"text\",\"batch\"],\"bind_slots\":%d,"
+             "\"groups\":%d,\"heap_free\":%u,\"heap_largest\":%u,"
              "\"codecs\":[\"raw_rgb565\",\"delta_rle_v1\"]}",
              s_device, s_inline_max, (unsigned)wd_http_max_body(),
-             BIND_SLOT_MAX, (unsigned)heap_free, (unsigned)heap_largest);
+             BIND_SLOT_MAX, CONTRACT_GROUP_SLOTS, (unsigned)heap_free,
+             (unsigned)heap_largest);
     esp_mqtt_client_publish(s_client, s_topic_status, body, 0, 1, 1);
 }
 

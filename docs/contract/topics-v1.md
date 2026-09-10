@@ -23,8 +23,9 @@ LAN plaintext MQTT (W10). Device id is a **configured name** (NVS / `CONFIG_WD_D
   "inline_max": 6144,
   "http": true,
   "http_max": 65536,
-  "l1": ["fill_rect", "text"],
+  "l1": ["fill_rect", "text", "batch"],
   "bind_slots": 8,
+  "groups": 4,
   "heap_free": 120000,
   "heap_largest": 90000,
   "codecs": ["raw_rgb565", "delta_rle_v1"]

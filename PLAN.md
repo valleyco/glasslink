@@ -118,15 +118,14 @@ No production feature lands without a failing host test written first (except pu
 | **W17** | Value binds | Hybrid: **bind.define** (geometry once) + live UTF-8 on `wd/{id}/bind/{slot}/set` (and cmd `bind.set`). Erase via stored bg. Max 8 slots. No CBOR. | **agreed** |
 | **W18** | Heap / fragmentation | Step **13**: no residual malloc in delta decode; static HTTP RX pool; `heap_free`/`heap_largest` on status. | **done** |
 | **W19** | Showcase demo | After feature set is in place (not before): one **full** host-driven demo that exercises the product end-to-end on glass (and SDL). Builds on `wd_demo` / `wd_scene` — not a new stack. | **agreed** |
-| **W20** | L1 batch + groups (B1) | **draw.batch** first (one MQTT msg → many fill/text ops); then **group** slots (define once, redraw by id). No CBOR, no LVGL, no lines/images in batch v1. | **agreed** |
+| **W20** | L1 batch + groups (B1) | **draw.batch** + **group** slots (define/draw). No CBOR/LVGL; fill+text sub-ops only. | **done** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–13 done**. Flash deferred for glass QA (11–13).
-**Next scheduled:** Step **15** (W20 / B1 draw.batch + groups) — not started; wait for `go`.
-Then more backlog / glass QA; **Step 14 showcase** still after features feel complete.
+Steps **0–13, 15 done**. Flash deferred for glass QA.
+**Next:** glass QA when board free; more backlog; **Step 14 showcase** when features feel complete.
 
 
 ---
@@ -397,20 +396,15 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 ---
 
 ### Step 15 — L1 draw.batch + groups (B1)
-**Status:** `todo` · **Depends on:** Step 12 (L1 ops + binds exist) · **Decision:** W20  
-**Do not start until explicit `go`.**
+**Status:** `done` · **Depends on:** Step 12 · **Decision:** W20  
 
-Thin-client win: fewer MQTT round-trips and fast redraw of named chrome without re-uploading every fill/text.
+| Slice | Intent | Result |
+|-------|--------|--------|
+| 15a | `draw.batch` (`0x07`) fill+text packed ops | Host apply + parse; caps 1024 B / 32 ops |
+| 15b | Groups 0..3: `0x08` define / `0x09` draw | Static store in contract; redraw after clear |
+| 15c | Tools/docs/status | inject batch/group-*; scene `batch_group.yaml`; status `batch`+`groups` |
 
-| Slice | Intent |
-|-------|--------|
-| 15a | `draw.batch` (`0x07`): payload = packed sub-ops **fill_rect** + **text** only; cap ops + bytes under `inline_max`; host TDD on fake_display |
-| 15b | **Groups:** small static table (e.g. 4 ids); `group.define` stores a batch; `group.draw` re-runs it (erase optional via clear/fill in the batch itself) |
-| 15c | Tools: inject/scene helpers; status advertises `batch` / `groups`; docs in `cmd-v1.md` |
-
-**Out of scope:** CBOR, LVGL, line/arc/image ops, `wd/group/+/cmd` fan-out topics, unbounded heap for stored ops.
-
-**Done when:** host tests green; one scene draws a panel via batch and redraws via group id; IDF builds (glass QA when flashable).
+**Done when:** host tests green; one scene draws via batch and redraws via group; IDF builds. ✓ (glass QA deferred)
 
 ---
 
@@ -418,7 +412,7 @@ Thin-client win: fewer MQTT round-trips and fast redraw of named chrome without 
 
 | ID | Item |
 |----|------|
-| B1 | L1 draw.batch + groups — **Step 15** (W20) |
+| B1 | L1 draw.batch + groups — **done** Step 15 (W20) |
 | B2 | MQTT value binds → text slots — **done** Step 12 |
 | B3 | TLS / credentials story (**W10**) |
 | B4 | Touch events upward (reuse invaders touch later) |
@@ -486,4 +480,4 @@ make build flash monitor   # IDF device (later)
 4. Step 10 path: **B-http** (locked). Step 11 early L1: **W16** (fill_rect + text).
 5. Step 13 (W18 heap) — **done** (host + IDF build; glass heap measure when flashable).
 6. Showcase demo (W19 / Step 14 / B-showcase) — **after** features; wait for explicit `go`.
-7. B1 draw.batch + groups (W20 / Step 15) — **locked**; wait for `go`.
+7. B1 draw.batch + groups (W20 / Step 15) — **done**.

@@ -20,7 +20,7 @@ Device (ESP-IDF)
 
 - **Control plane:** MQTT binary commands (L0 + early L1).
 - **Bulk HTTP `uri`:** Step 10-B — `FLAG_URI` + static body pool (`http_max` cap)
-- **Display language:** L0 rects/clear + L1 `fill_rect` / `draw.text` (W16)
+- **Display language:** L0 rects/clear + L1 fill/text/batch + groups (W16/W20) + binds (W17)
 - **Heap:** Step 13 — stream delta decode (no residual malloc); status `heap_free`/`heap_largest`
 
 ## Frozen decisions (see PLAN.md)
@@ -66,7 +66,7 @@ make build flash monitor   # after IDF skeleton
 
 ## Out of scope for v1
 
-LVGL/L2, draw.batch, touch, TLS, HTTP pull, CBOR on device, full-frame FB on classic CYD, Arduino-first stack.
+LVGL/L2, touch, TLS, CBOR on device, full-frame FB on classic CYD, Arduino-first stack.
 
 ## Related trees
 

@@ -67,6 +67,12 @@ make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
 ./tools/wd_mqtt.py inject text --device cyd1 --x 16 --y 60 --text "hello" --scale 2
 ```
 
+### Batch + groups (W20)
+
+```bash
+./tools/wd_scene.py tools/scenes/batch_group.yaml --device cyd1
+```
+
 ### Value binds
 
 ```bash
@@ -138,7 +144,7 @@ Codec freeze notes: [`docs/benches/codec-v1.md`](docs/benches/codec-v1.md).
 
 ## v1 scope
 
-**In:** L0 raster + clear, L1 `fill_rect` + `draw.text`, MQTT inline + `FLAG_URI` HTTP, codecs, host TDD, LAN plaintext MQTT.  
+**In:** L0 raster + clear, L1 fill/text/batch + groups, binds, MQTT inline + `FLAG_URI` HTTP, codecs, host TDD, LAN plaintext MQTT.
 **Out:** CBOR, touch, TLS, LVGL, value binds (see backlog in `PLAN.md`).
 
 ---

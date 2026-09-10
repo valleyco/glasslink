@@ -1,4 +1,4 @@
-# L0/L1 binary command envelope (W9 + W15 URI + W16 early L1)
+# L0/L1 binary command envelope (W9 + W15 URI + W16 early L1 + W20 batch/groups)
 
 Normative wire format for MQTT `cmd` payloads (and host tools).  
 **Little-endian** multi-byte fields. No CBOR/JSON on device v1.
@@ -34,6 +34,11 @@ Total message size = `28 + payload_len`.
 | `0x02` | `raster.rect` | pixels **or** URI | `x,y,w,h`; `enc` = codec |
 | `0x03` | `display.fill_rect` | empty | `x,y,w,h` + `color`; flags 0 |
 | `0x04` | `draw.text` | UTF-8 (1…64) | `x,y` origin; `color` = fg; `enc` = scale (0/1→1, 2→2) |
+| `0x05` | `bind.define` | bg+text | see binds |
+| `0x06` | `bind.set` | UTF-8 | see binds |
+| `0x07` | `draw.batch` | packed sub-ops | see batch (W20) |
+| `0x08` | `group.define` | packed sub-ops | `id` = group 0..3; store + draw |
+| `0x09` | `group.draw` | empty | `id` = group; redraw stored |
 
 ## Flags
 
@@ -61,12 +66,23 @@ Device 5×7 ASCII (`0x20`–`0x7E`); transparent bg; scale 1 or 2; advance `6*sc
 Live path (no envelope): publish UTF-8 to `wd/{device}/bind/{slot}/set`.  
 Device erases slot bbox with stored `bg`, then redraws text.
 
+## draw.batch / groups (W20)
+
+Payload of `draw.batch` and `group.define` is a sequence of sub-ops (LE), max **1024** bytes / **32** ops:
+
+| Op | Byte | Layout |
+|----|------|--------|
+| fill | `0x03` | `x:i16 y:i16 w:u16 h:u16 color:u16` (11 B total) |
+| text | `0x04` | `x:i16 y:i16 color:u16 scale:u8 len:u8 utf8[len]` (9+len) |
+
+`group.define` (`id` 0..3) applies then stores the payload. `group.draw` re-runs the stored batch (no heap). Four static group slots.
+
 ## Errors
 
 `CONTRACT_ERR_*` as before, plus fetch failures for URI.
 
 ## Pack API
 
-`contract_pack_clear`, `contract_pack_rect[_flags]`, `contract_pack_fill_rect`, `contract_pack_text`.
+`contract_pack_clear`, `contract_pack_rect[_flags]`, `contract_pack_fill_rect`, `contract_pack_text`, `contract_pack_batch`, `contract_pack_group_*`.
 
 MQTT topics: [`topics-v1.md`](topics-v1.md).

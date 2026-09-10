@@ -237,6 +237,69 @@ static void test_dispatch_bind(void)
     ASSERT_EQ_INT(0, strcmp(bind_get(0)->text, "99"));
 }
 
+static void test_dispatch_batch(void)
+{
+    uint8_t ops[64];
+    uint8_t msg[128];
+    size_t o = 0;
+    size_t n;
+    size_t w;
+
+    fake_display_reset();
+    w = contract_batch_put_fill(ops + o, sizeof(ops) - o, 10, 20, 4, 2, 0xF800);
+    ASSERT_TRUE(w > 0);
+    o += w;
+    w = contract_batch_put_text(ops + o, sizeof(ops) - o, 0, 0, 0xFFFF, 1,
+                                (const uint8_t *)"Hi", 2);
+    ASSERT_TRUE(w > 0);
+    o += w;
+    n = contract_pack_batch(msg, sizeof(msg), 1, 1, ops, (uint32_t)o);
+    ASSERT_TRUE(n > 0);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(10, 20));
+    ASSERT_EQ_U16(0xF800, fake_display_get_pixel(13, 21));
+    ASSERT_TRUE(fake_display_get_pixel(0, 0) == 0xFFFF ||
+                fake_display_get_pixel(1, 1) == 0xFFFF);
+}
+
+static void test_dispatch_group(void)
+{
+    uint8_t ops[32];
+    uint8_t msg[96];
+    size_t o = 0;
+    size_t n;
+    size_t w;
+
+    fake_display_reset();
+    contract_group_reset();
+    w = contract_batch_put_fill(ops + o, sizeof(ops) - o, 5, 5, 3, 3, 0x07E0);
+    ASSERT_TRUE(w > 0);
+    o += w;
+    n = contract_pack_group_define(msg, sizeof(msg), 0, 1, ops, (uint32_t)o);
+    ASSERT_TRUE(n > 0);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0x07E0, fake_display_get_pixel(5, 5));
+
+    /* clear panel then redraw group */
+    n = contract_pack_clear(msg, sizeof(msg), 0, 2, 0x0000);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0x0000, fake_display_get_pixel(5, 5));
+    n = contract_pack_group_draw(msg, sizeof(msg), 0, 3);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(msg, n));
+    ASSERT_EQ_U16(0x07E0, fake_display_get_pixel(5, 5));
+    ASSERT_EQ_U16(0x07E0, fake_display_get_pixel(7, 7));
+}
+
+static void test_group_draw_undefined_fails(void)
+{
+    uint8_t msg[64];
+    size_t n;
+
+    contract_group_reset();
+    n = contract_pack_group_draw(msg, sizeof(msg), 1, 0);
+    ASSERT_EQ_INT(CONTRACT_ERR_ARG, contract_dispatch(msg, n));
+}
+
 int main(void)
 {
     test_dispatch_clear();
@@ -249,5 +312,8 @@ int main(void)
     test_dispatch_fill_rect();
     test_dispatch_text();
     test_dispatch_bind();
+    test_dispatch_batch();
+    test_dispatch_group();
+    test_group_draw_undefined_fails();
     return test_report();
 }

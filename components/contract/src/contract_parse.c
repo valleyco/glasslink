@@ -185,6 +185,36 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
             return CONTRACT_ERR_PAYLOAD;
         }
         break;
+    case CONTRACT_TYPE_DRAW_BATCH:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (plen == 0 || plen > (uint32_t)CONTRACT_BATCH_BYTES_MAX) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        break;
+    case CONTRACT_TYPE_GROUP_DEFINE:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (out->id >= (uint16_t)CONTRACT_GROUP_SLOTS) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (plen == 0 || plen > (uint32_t)CONTRACT_BATCH_BYTES_MAX) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        break;
+    case CONTRACT_TYPE_GROUP_DRAW:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (out->id >= (uint16_t)CONTRACT_GROUP_SLOTS) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (plen != 0) {
+            return CONTRACT_ERR_ARG;
+        }
+        break;
     default:
         return CONTRACT_ERR_TYPE;
     }
@@ -345,4 +375,95 @@ size_t contract_pack_bind_set(uint8_t *out, size_t out_cap, uint16_t slot,
     wr_u32(out + 24, len);
     memcpy(out + CONTRACT_HDR_SIZE, utf8, len);
     return total;
+}
+
+size_t contract_batch_put_fill(uint8_t *dst, size_t dst_cap, int16_t x,
+                               int16_t y, uint16_t w, uint16_t h,
+                               uint16_t color)
+{
+    if (!dst || w == 0 || h == 0 || dst_cap < 11) {
+        return 0;
+    }
+    dst[0] = CONTRACT_BATCH_OP_FILL;
+    wr_i16(dst + 1, x);
+    wr_i16(dst + 3, y);
+    wr_u16(dst + 5, w);
+    wr_u16(dst + 7, h);
+    wr_u16(dst + 9, color);
+    return 11;
+}
+
+size_t contract_batch_put_text(uint8_t *dst, size_t dst_cap, int16_t x,
+                               int16_t y, uint16_t color, uint8_t scale,
+                               const uint8_t *utf8, uint8_t len)
+{
+    size_t need = 9u + (size_t)len;
+    if (!dst || !utf8 || len == 0 || len > (uint8_t)CONTRACT_TEXT_MAX) {
+        return 0;
+    }
+    if (scale > 2 || dst_cap < need) {
+        return 0;
+    }
+    dst[0] = CONTRACT_BATCH_OP_TEXT;
+    wr_i16(dst + 1, x);
+    wr_i16(dst + 3, y);
+    wr_u16(dst + 5, color);
+    dst[7] = scale;
+    dst[8] = len;
+    memcpy(dst + 9, utf8, len);
+    return need;
+}
+
+static size_t pack_with_payload(uint8_t *out, size_t out_cap, uint8_t type,
+                                uint16_t id, uint16_t seq, const uint8_t *payload,
+                                uint32_t payload_len)
+{
+    size_t total = (size_t)CONTRACT_HDR_SIZE + (size_t)payload_len;
+    if (!out || (payload_len > 0 && !payload) || out_cap < total) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, type, id, seq);
+    wr_u32(out + 24, payload_len);
+    if (payload_len) {
+        memcpy(out + CONTRACT_HDR_SIZE, payload, payload_len);
+    }
+    return total;
+}
+
+size_t contract_pack_batch(uint8_t *out, size_t out_cap, uint16_t id,
+                           uint16_t seq, const uint8_t *ops, uint32_t ops_len)
+{
+    if (ops_len == 0 || ops_len > (uint32_t)CONTRACT_BATCH_BYTES_MAX) {
+        return 0;
+    }
+    return pack_with_payload(out, out_cap, CONTRACT_TYPE_DRAW_BATCH, id, seq, ops,
+                             ops_len);
+}
+
+size_t contract_pack_group_define(uint8_t *out, size_t out_cap, uint16_t group,
+                                  uint16_t seq, const uint8_t *ops,
+                                  uint32_t ops_len)
+{
+    if (group >= (uint16_t)CONTRACT_GROUP_SLOTS) {
+        return 0;
+    }
+    if (ops_len == 0 || ops_len > (uint32_t)CONTRACT_BATCH_BYTES_MAX) {
+        return 0;
+    }
+    return pack_with_payload(out, out_cap, CONTRACT_TYPE_GROUP_DEFINE, group, seq,
+                             ops, ops_len);
+}
+
+size_t contract_pack_group_draw(uint8_t *out, size_t out_cap, uint16_t group,
+                                uint16_t seq)
+{
+    if (!out || group >= (uint16_t)CONTRACT_GROUP_SLOTS ||
+        out_cap < (size_t)CONTRACT_HDR_SIZE) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_GROUP_DRAW, group, seq);
+    wr_u32(out + 24, 0);
+    return (size_t)CONTRACT_HDR_SIZE;
 }
