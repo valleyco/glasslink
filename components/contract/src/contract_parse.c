@@ -152,9 +152,37 @@ int contract_parse(const uint8_t *buf, size_t len, contract_msg_t *out)
         if (plen == 0 || plen > (uint32_t)CONTRACT_TEXT_MAX) {
             return CONTRACT_ERR_PAYLOAD;
         }
-        /* enc = scale: 0 or 1 → 1; 2 → 2; else bad */
         if (out->enc > 2) {
             return CONTRACT_ERR_ARG;
+        }
+        break;
+    case CONTRACT_TYPE_BIND_DEFINE:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (out->id >= (uint16_t)CONTRACT_BIND_SLOTS) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (out->w == 0 || out->w > (uint16_t)CONTRACT_TEXT_MAX) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (out->enc > 2) {
+            return CONTRACT_ERR_ARG;
+        }
+        /* payload: bg_u16 + optional text */
+        if (plen < 2 || plen > 2u + (uint32_t)CONTRACT_TEXT_MAX) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        break;
+    case CONTRACT_TYPE_BIND_SET:
+        if (flags != 0) {
+            return CONTRACT_ERR_FLAGS;
+        }
+        if (out->id >= (uint16_t)CONTRACT_BIND_SLOTS) {
+            return CONTRACT_ERR_ARG;
+        }
+        if (plen == 0 || plen > (uint32_t)CONTRACT_TEXT_MAX) {
+            return CONTRACT_ERR_PAYLOAD;
         }
         break;
     default:
@@ -260,6 +288,60 @@ size_t contract_pack_text(uint8_t *out, size_t out_cap, uint16_t id,
     wr_i16(out + 14, y);
     out[20] = scale; /* 0/1 → scale 1 at apply */
     wr_u16(out + 22, color);
+    wr_u32(out + 24, len);
+    memcpy(out + CONTRACT_HDR_SIZE, utf8, len);
+    return total;
+}
+
+size_t contract_pack_bind_define(uint8_t *out, size_t out_cap, uint16_t slot,
+                                 uint16_t seq, int16_t x, int16_t y,
+                                 uint16_t fg, uint16_t bg, uint8_t scale,
+                                 uint8_t max_chars, const uint8_t *utf8,
+                                 uint32_t text_len)
+{
+    uint32_t plen = 2u + text_len;
+    size_t total = (size_t)CONTRACT_HDR_SIZE + (size_t)plen;
+
+    if (!out || slot >= (uint16_t)CONTRACT_BIND_SLOTS) {
+        return 0;
+    }
+    if (max_chars == 0 || max_chars > (uint8_t)CONTRACT_TEXT_MAX || scale > 2) {
+        return 0;
+    }
+    if (text_len > 0 && !utf8) {
+        return 0;
+    }
+    if (text_len > (uint32_t)CONTRACT_TEXT_MAX || out_cap < total) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_BIND_DEFINE, slot, seq);
+    wr_i16(out + 12, x);
+    wr_i16(out + 14, y);
+    wr_u16(out + 16, max_chars);
+    out[20] = scale;
+    wr_u16(out + 22, fg);
+    wr_u32(out + 24, plen);
+    wr_u16(out + CONTRACT_HDR_SIZE, bg);
+    if (text_len) {
+        memcpy(out + CONTRACT_HDR_SIZE + 2, utf8, text_len);
+    }
+    return total;
+}
+
+size_t contract_pack_bind_set(uint8_t *out, size_t out_cap, uint16_t slot,
+                              uint16_t seq, const uint8_t *utf8, uint32_t len)
+{
+    size_t total = (size_t)CONTRACT_HDR_SIZE + (size_t)len;
+
+    if (!out || !utf8 || len == 0 || len > (uint32_t)CONTRACT_TEXT_MAX) {
+        return 0;
+    }
+    if (slot >= (uint16_t)CONTRACT_BIND_SLOTS || out_cap < total) {
+        return 0;
+    }
+    memset(out, 0, CONTRACT_HDR_SIZE);
+    hdr_common(out, CONTRACT_TYPE_BIND_SET, slot, seq);
     wr_u32(out + 24, len);
     memcpy(out + CONTRACT_HDR_SIZE, utf8, len);
     return total;

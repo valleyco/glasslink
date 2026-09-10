@@ -1,5 +1,6 @@
 #include "codec.h"
 #include "contract.h"
+#include "bind.h"
 #include "fake_display.h"
 #include "render.h"
 #include "test_assert.h"
@@ -216,6 +217,26 @@ static void test_dispatch_text(void)
     ASSERT_TRUE(lit > 5);
 }
 
+static void test_dispatch_bind(void)
+{
+    uint8_t buf[128];
+    size_t n;
+    const char *init = "12.3";
+    const char *upd = "99";
+
+    fake_display_reset();
+    bind_reset();
+    n = contract_pack_bind_define(buf, sizeof(buf), 0, 1, 8, 16, 0xFFFF, 0x0010,
+                                  1, 8, (const uint8_t *)init, 4);
+    ASSERT_TRUE(n > 0);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(buf, n));
+    ASSERT_EQ_INT(0, strcmp(bind_get(0)->text, "12.3"));
+
+    n = contract_pack_bind_set(buf, sizeof(buf), 0, 2, (const uint8_t *)upd, 2);
+    ASSERT_EQ_INT(CONTRACT_OK, contract_dispatch(buf, n));
+    ASSERT_EQ_INT(0, strcmp(bind_get(0)->text, "99"));
+}
+
 int main(void)
 {
     test_dispatch_clear();
@@ -227,5 +248,6 @@ int main(void)
     test_uri_without_fetch_fails();
     test_dispatch_fill_rect();
     test_dispatch_text();
+    test_dispatch_bind();
     return test_report();
 }

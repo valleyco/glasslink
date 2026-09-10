@@ -9,7 +9,7 @@ LAN plaintext MQTT (W10). Device id is a **configured name** (NVS / `CONFIG_WD_D
 | `wd/{device_id}/cmd` | host → device | no | binary L0 envelope ([`cmd-v1.md`](cmd-v1.md)) |
 | `wd/{device_id}/ack` | device → host | no | JSON: `{"rc":N,"n":bytes,"id":U,"seq":U}` after each cmd |
 | `wd/{device_id}/status` | device → host | **yes** | JSON capabilities (see below) |
-| `wd/{device_id}/lwt` | broker/device | **yes** | `online` on connect; LWT `offline` on unclean disconnect |
+| `wd/{device_id}/bind/{slot}/set` | host → device | no | UTF-8 live value for text slot (0..7) |
 
 `rc` matches `contract` status (`0` = `CONTRACT_OK`). `id`/`seq` are peeked from the cmd header (0 if truncated).
 

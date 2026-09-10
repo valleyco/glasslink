@@ -233,6 +233,40 @@ def run_scene(scene: dict, args: argparse.Namespace) -> int:
                     wm.pack_text(cmd_id, seq, x, y, color, text, scale=scale),
                 )
                 seq += 1
+            elif op in ("bind_define", "bind-define"):
+                slot = int(body["slot"])
+                x = int(body.get("x", 0))
+                y = int(body.get("y", 0))
+                fg = parse_color(body.get("fg", body.get("color", 0xFFFF)))
+                bg = parse_color(body.get("bg", 0x0000))
+                scale = int(body.get("scale", 2))
+                max_chars = int(body.get("max_chars", body.get("max-chars", 8)))
+                text = str(body.get("text", ""))
+                publish_all(
+                    client,
+                    devices,
+                    wm.pack_bind_define(
+                        slot, seq, x, y, fg, bg, scale, max_chars, text
+                    ),
+                )
+                seq += 1
+            elif op in ("bind_set", "bind-set"):
+                slot = int(body["slot"])
+                text = str(body["text"])
+                # Prefer live MQTT topic when use_topic: true
+                if body.get("topic") or body.get("use_topic"):
+                    for d in devices:
+                        t = wm.topic_bind_set(d, slot)
+                        info = client.publish(t, text.encode("utf-8"), qos=1)
+                        info.wait_for_publish(timeout=5)
+                        if not info.is_published():
+                            raise TimeoutError(f"bind-pub timeout → {t}")
+                    print(f"  bind topic slot={slot} {text!r} → {devices}")
+                else:
+                    publish_all(
+                        client, devices, wm.pack_bind_set(slot, seq, text)
+                    )
+                    seq += 1
             elif op == "checker":
                 x = int(body.get("x", 0))
                 y = int(body.get("y", 0))

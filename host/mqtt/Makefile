@@ -6,6 +6,7 @@ CPPFLAGS := \
 	-I$(ROOT)/components/contract/include \
 	-I$(ROOT)/components/codec/include \
 	-I$(ROOT)/components/render/include \
+	-I$(ROOT)/components/bind/include \
 	-I$(ROOT)/components/board/include \
 	-I$(ROOT)/host/fake_display \
 	-I$(ROOT)/host/common
@@ -17,6 +18,7 @@ SRCS_COMMON := \
 	$(ROOT)/components/codec/src/codec_raw.c \
 	$(ROOT)/components/codec/src/codec_delta_rle.c \
 	$(ROOT)/components/render/src/render.c \
+	$(ROOT)/components/bind/src/bind.c \
 	$(ROOT)/host/fake_display/fake_display.c
 
 BINS := apply_bin encode_rect

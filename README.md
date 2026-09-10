@@ -67,6 +67,15 @@ make scene SCENE=tools/scenes/hello.yaml WD_DEVICE=cyd1
 ./tools/wd_mqtt.py inject text --device cyd1 --x 16 --y 60 --text "hello" --scale 2
 ```
 
+### Value binds
+
+```bash
+./tools/wd_mqtt.py inject bind-define --device cyd1 --slot 0 --x 16 --y 80 \
+  --fg 0xFFFF --bg 0x0011 --scale 2 --max-chars 8 --text "0.0"
+./tools/wd_mqtt.py inject bind-pub --device cyd1 --slot 0 --text "42.5"
+./tools/wd_scene.py tools/scenes/bind_demo.yaml --device cyd1
+```
+
 ### HTTP URI (large rects)
 
 Encode → serve on LAN → MQTT carries URL only (`FLAG_URI`):

@@ -15,6 +15,7 @@
 #include "wd_http.h"
 #include "wd_mqtt.h"
 
+#include "bind.h"
 #include "contract.h"
 
 #include <stdio.h>
@@ -72,6 +73,7 @@ void wd_net_start(void)
     wifi_start(&cfg);
 
     contract_set_fetch(wd_http_fetch, NULL);
+    bind_reset();
 
     wd_mqtt_cfg_t m = {
         .uri = cfg.mqtt_uri,

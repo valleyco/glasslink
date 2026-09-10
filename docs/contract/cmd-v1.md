@@ -51,6 +51,16 @@ Total message size = `28 + payload_len`.
 
 Device 5×7 ASCII (`0x20`–`0x7E`); transparent bg; scale 1 or 2; advance `6*scale` px.
 
+## Value binds (W17)
+
+| Type | Name | Notes |
+|------|------|-------|
+| `0x05` | `bind.define` | `id`=slot 0..7; `w`=max_chars; `enc`=scale; `color`=fg; payload = `bg_u16_le` + optional UTF-8 |
+| `0x06` | `bind.set` | `id`=slot; payload = UTF-8 value |
+
+Live path (no envelope): publish UTF-8 to `wd/{device}/bind/{slot}/set`.  
+Device erases slot bbox with stored `bg`, then redraws text.
+
 ## Errors
 
 `CONTRACT_ERR_*` as before, plus fetch failures for URI.

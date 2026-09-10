@@ -6,6 +6,7 @@ CPPFLAGS := \
 	-I$(ROOT)/components/contract/include \
 	-I$(ROOT)/components/codec/include \
 	-I$(ROOT)/components/render/include \
+	-I$(ROOT)/components/bind/include \
 	-I$(ROOT)/components/board/include \
 	-I$(ROOT)/host/fake_display \
 	-I$(ROOT)/host/common
@@ -20,6 +21,7 @@ APPLY_SRCS := $(ROOT)/components/contract/src/contract_apply.c
 
 RENDER_SRCS := \
 	$(ROOT)/components/render/src/render.c \
+	$(ROOT)/components/bind/src/bind.c \
 	$(ROOT)/host/fake_display/fake_display.c
 
 TEST_BINS := test_contract_parse test_contract_apply

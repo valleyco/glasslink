@@ -1,0 +1,34 @@
+# Step 12 — bind slots (define once, update value live)
+name: bind_demo
+devices:
+  - cyd1
+defaults:
+  pause: 0.3
+steps:
+  - clear: { color: 0x0011 }
+  - fill: { x: 0, y: 0, w: 320, h: 32, color: 0x0410 }
+  - text: { text: "binds", x: 8, y: 8, color: 0xFFE0, scale: 2 }
+  - bind_define:
+      slot: 0
+      x: 16
+      y: 80
+      fg: 0xFFFF
+      bg: 0x0011
+      scale: 2
+      max_chars: 10
+      text: "0.0"
+  - bind_define:
+      slot: 1
+      x: 16
+      y: 120
+      fg: 0x07E0
+      bg: 0x0011
+      scale: 2
+      max_chars: 10
+      text: "idle"
+  - sleep: 0.5
+  - bind_set: { slot: 0, text: "42.5", use_topic: true }
+  - sleep: 0.5
+  - bind_set: { slot: 1, text: "RUN", use_topic: true }
+  - sleep: 0.5
+  - bind_set: { slot: 0, text: "100", use_topic: true }

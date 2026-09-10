@@ -1,5 +1,6 @@
 #include "contract.h"
 
+#include "bind.h"
 #include "codec.h"
 #include "render.h"
 
@@ -114,6 +115,44 @@ int contract_apply(const contract_msg_t *msg)
             return CONTRACT_ERR_ARG;
         }
         return CONTRACT_OK;
+    }
+
+    case CONTRACT_TYPE_BIND_DEFINE: {
+        uint16_t bg;
+        const uint8_t *text;
+        size_t tlen;
+        int brc;
+        uint8_t scale;
+
+        if (!msg->payload || msg->payload_len < 2) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        bg = (uint16_t)msg->payload[0] | ((uint16_t)msg->payload[1] << 8);
+        text = msg->payload + 2;
+        tlen = (size_t)msg->payload_len - 2;
+        scale = msg->enc ? msg->enc : 1;
+        brc = bind_define((uint8_t)msg->id, msg->x, msg->y, msg->color, bg, scale,
+                          (uint8_t)msg->w, text, tlen);
+        if (brc == BIND_OK) {
+            return CONTRACT_OK;
+        }
+        if (brc == BIND_ERR_SLOT) {
+            return CONTRACT_ERR_ARG;
+        }
+        return CONTRACT_ERR_ARG;
+    }
+
+    case CONTRACT_TYPE_BIND_SET: {
+        int brc;
+        if (!msg->payload || msg->payload_len == 0) {
+            return CONTRACT_ERR_PAYLOAD;
+        }
+        brc = bind_set_text((uint8_t)msg->id, msg->payload,
+                            (size_t)msg->payload_len);
+        if (brc == BIND_OK) {
+            return CONTRACT_OK;
+        }
+        return CONTRACT_ERR_ARG;
     }
 
     default:

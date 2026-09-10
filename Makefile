@@ -3,12 +3,12 @@
 IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
-.PHONY: test test-render test-codec test-contract bench-codec mqtt-loopback \
+.PHONY: test test-render test-codec test-contract test-bind bench-codec mqtt-loopback \
 	sim sim-mqtt demo demo-fetch demo-sim scene clean \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
-test: test-render test-codec test-contract
+test: test-render test-codec test-contract test-bind
 
 test-render:
 	$(MAKE) -C host/render test
@@ -18,6 +18,9 @@ test-codec:
 
 test-contract:
 	$(MAKE) -C host/contract test
+
+test-bind:
+	$(MAKE) -C host/bind test
 
 bench-codec:
 	$(MAKE) -C host/codec bench

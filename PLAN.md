@@ -115,12 +115,13 @@ No production feature lands without a failing host test written first (except pu
 | **W14** | Post-v1 order | **A → D → (B or C):** (A) product polish, (D) thin Python scene/host composer, then either **B-http** (bigger pictures) or **L1 start** (fill/text + later binds) — pick at Step 10. No codec-v2 / LVGL until scheduled. | **agreed** |
 | **W15** | Step 10 path | **B-http**: `FLAG_URI` on `raster.rect`; MQTT carries URL; device `esp_http_client` GET → decode → blit. Cap body (no full-FB raw). L1 deferred. | **agreed** |
 | **W16** | Early L1 slice | **fill_rect** + **draw.text** (device 5×7 ASCII bitmap, fg color, no binds yet). No draw.batch / groups / LVGL. Binds = B2 later. | **agreed** |
+| **W17** | Value binds | Hybrid: **bind.define** (geometry once) + live UTF-8 on `wd/{id}/bind/{slot}/set` (and cmd `bind.set`). Erase via stored bg. Max 8 slots. No CBOR. | **agreed** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–11 done** (W16 early L1: fill_rect + text). Next: binds (B2) or polish.
+Steps **0–12 done** (W17 value binds). Flash deferred for glass QA.
 
 ---
 
@@ -343,12 +344,24 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 
 ---
 
+### Step 12 — MQTT value binds → text slots (B2)
+**Status:** `done` (2026-09-10) · **Depends on:** Step 11 · **Decision:** W17
+
+- `0x05` `bind.define` — slot id, x,y, fg, scale, max_chars, bg+optional initial text
+- `0x06` `bind.set` — slot id + UTF-8 value (cmd path)
+- MQTT `wd/{device}/bind/{slot}/set` — UTF-8 value (live path)
+- Host-testable `components/bind`; erase bg then redraw 5×7 text
+
+**Delivered:** bind component + `0x05`/`0x06` + MQTT `bind/+/set`; tools/scene. ✓
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
 |----|------|
 | B1 | L1 draw.batch + groups (fill/text started in Step 11) |
-| B2 | MQTT value binds → text slots |
+| B2 | MQTT value binds → text slots — **done** Step 12 |
 | B3 | TLS / credentials story (**W10**) |
 | B4 | Touch events upward (reuse invaders touch later) |
 | B5 | Image sequence / P-frame compression |

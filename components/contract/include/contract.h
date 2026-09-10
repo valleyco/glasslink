@@ -11,7 +11,8 @@ enum {
     CONTRACT_VER = 1,
     CONTRACT_HDR_SIZE = 28,
     CONTRACT_URI_MAX = 256,
-    CONTRACT_TEXT_MAX = 64
+    CONTRACT_TEXT_MAX = 64,
+    CONTRACT_BIND_SLOTS = 8
 };
 
 /** Wire magic: 'W' 'L' 'D' '1' */
@@ -26,7 +27,9 @@ typedef enum contract_type {
     CONTRACT_TYPE_DISPLAY_CLEAR = 0x01,
     CONTRACT_TYPE_RASTER_RECT = 0x02,
     CONTRACT_TYPE_FILL_RECT = 0x03,
-    CONTRACT_TYPE_DRAW_TEXT = 0x04
+    CONTRACT_TYPE_DRAW_TEXT = 0x04,
+    CONTRACT_TYPE_BIND_DEFINE = 0x05,
+    CONTRACT_TYPE_BIND_SET = 0x06
 } contract_type_t;
 
 enum {
@@ -97,6 +100,17 @@ size_t contract_pack_fill_rect(uint8_t *out, size_t out_cap, uint16_t id,
 size_t contract_pack_text(uint8_t *out, size_t out_cap, uint16_t id,
                           uint16_t seq, int16_t x, int16_t y, uint16_t color,
                           uint8_t scale, const uint8_t *utf8, uint32_t len);
+
+/** id = slot (0..7). w = max_chars. payload = bg_u16_le + optional UTF-8. */
+size_t contract_pack_bind_define(uint8_t *out, size_t out_cap, uint16_t slot,
+                                 uint16_t seq, int16_t x, int16_t y,
+                                 uint16_t fg, uint16_t bg, uint8_t scale,
+                                 uint8_t max_chars, const uint8_t *utf8,
+                                 uint32_t text_len);
+
+/** id = slot. payload = UTF-8 value. */
+size_t contract_pack_bind_set(uint8_t *out, size_t out_cap, uint16_t slot,
+                              uint16_t seq, const uint8_t *utf8, uint32_t len);
 
 #ifdef __cplusplus
 }

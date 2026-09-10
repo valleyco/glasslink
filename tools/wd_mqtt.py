@@ -51,12 +51,15 @@ TYPE_CLEAR = 0x01
 TYPE_RECT = 0x02
 TYPE_FILL = 0x03
 TYPE_TEXT = 0x04
+TYPE_BIND_DEFINE = 0x05
+TYPE_BIND_SET = 0x06
 ENC_RAW = 0
 ENC_DELTA = 1
 FMT_RGB565 = 0
 FLAG_URI = 1 << 0
 INLINE_MAX = 6144  # docs/contract/mqtt-topics-v1.md
 TEXT_MAX = 64
+BIND_SLOTS = 8
 
 # LE header: magic[4] ver type flags pad id seq x y w h enc fmt color payload_len
 _HDR = "<4sBBBBHHhhHHBBHI"
@@ -139,6 +142,75 @@ def pack_text(
         len(raw),
     )
     return hdr + raw
+
+
+def pack_bind_define(
+    slot: int,
+    seq: int,
+    x: int,
+    y: int,
+    fg: int,
+    bg: int,
+    scale: int,
+    max_chars: int,
+    text: str = "",
+) -> bytes:
+    if not (0 <= slot < BIND_SLOTS):
+        raise ValueError("slot out of range")
+    raw = text.encode("utf-8")
+    if len(raw) > TEXT_MAX:
+        raise ValueError("text too long")
+    body = struct.pack("<H", bg & 0xFFFF) + raw
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_BIND_DEFINE,
+        0,
+        0,
+        slot & 0xFFFF,
+        seq & 0xFFFF,
+        x,
+        y,
+        max_chars & 0xFFFF,
+        0,
+        scale & 0xFF,
+        FMT_RGB565,
+        fg & 0xFFFF,
+        len(body),
+    )
+    return hdr + body
+
+
+def pack_bind_set(slot: int, seq: int, text: str) -> bytes:
+    if not (0 <= slot < BIND_SLOTS):
+        raise ValueError("slot out of range")
+    raw = text.encode("utf-8")
+    if not raw or len(raw) > TEXT_MAX:
+        raise ValueError(f"text length must be 1..{TEXT_MAX}")
+    hdr = struct.pack(
+        _HDR,
+        MAGIC,
+        1,
+        TYPE_BIND_SET,
+        0,
+        0,
+        slot & 0xFFFF,
+        seq & 0xFFFF,
+        0,
+        0,
+        0,
+        0,
+        0,
+        FMT_RGB565,
+        0,
+        len(raw),
+    )
+    return hdr + raw
+
+
+def topic_bind_set(device: str, slot: int) -> str:
+    return f"wd/{device}/bind/{slot}/set"
 
 
 def pack_rect(
@@ -317,6 +389,36 @@ def cmd_inject(args: argparse.Namespace) -> int:
                 scale=args.scale,
             )
             check_inline_max(payload, enforce=True)
+        elif args.subcmd == "bind-define":
+            payload = pack_bind_define(
+                args.slot,
+                args.seq,
+                args.x,
+                args.y,
+                args.fg,
+                args.bg,
+                args.scale,
+                args.max_chars,
+                args.text or "",
+            )
+        elif args.subcmd == "bind-set":
+            payload = pack_bind_set(args.slot, args.seq, args.text)
+        elif args.subcmd == "bind-pub":
+            # live MQTT value path (no binary cmd)
+            c = mqtt_client(args.host, args.port, f"wd-bind-{os.getpid()}")
+            c.loop_start()
+            t = topic_bind_set(args.device, args.slot)
+            raw = args.text.encode("utf-8")
+            info = c.publish(t, raw, qos=1)
+            info.wait_for_publish(timeout=5)
+            ok = info.is_published()
+            c.loop_stop()
+            c.disconnect()
+            if not ok:
+                print("publish timeout", file=sys.stderr)
+                return 1
+            print(f"published {len(raw)} B → {t}")
+            return 0
         elif args.subcmd == "rect":
             uri = getattr(args, "uri", None)
             if uri:
@@ -729,6 +831,27 @@ def build_parser() -> argparse.ArgumentParser:
     tcmd.add_argument("--color", type=lambda s: int(s, 0), default=0xFFFF)
     tcmd.add_argument("--scale", type=int, choices=(1, 2), default=2)
     tcmd.add_argument("--text", required=True)
+
+    bd = isub.add_parser("bind-define", help="define text bind slot")
+    _inj_common(bd)
+    bd.add_argument("--slot", type=int, required=True)
+    bd.add_argument("--x", type=int, default=0)
+    bd.add_argument("--y", type=int, default=0)
+    bd.add_argument("--fg", type=lambda s: int(s, 0), default=0xFFFF)
+    bd.add_argument("--bg", type=lambda s: int(s, 0), default=0x0000)
+    bd.add_argument("--scale", type=int, choices=(1, 2), default=2)
+    bd.add_argument("--max-chars", type=int, default=8)
+    bd.add_argument("--text", default="", help="optional initial value")
+
+    bs = isub.add_parser("bind-set", help="set bind slot via cmd envelope")
+    _inj_common(bs)
+    bs.add_argument("--slot", type=int, required=True)
+    bs.add_argument("--text", required=True)
+
+    bp = isub.add_parser("bind-pub", help="publish live value to bind/{slot}/set")
+    _inj_common(bp)
+    bp.add_argument("--slot", type=int, required=True)
+    bp.add_argument("--text", required=True)
 
     r = isub.add_parser("rect")
     _inj_common(r)
