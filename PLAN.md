@@ -117,13 +117,14 @@ No production feature lands without a failing host test written first (except pu
 | **W16** | Early L1 slice | **fill_rect** + **draw.text** (device 5×7 ASCII bitmap, fg color, no binds yet). No draw.batch / groups / LVGL. Binds = B2 later. | **agreed** |
 | **W17** | Value binds | Hybrid: **bind.define** (geometry once) + live UTF-8 on `wd/{id}/bind/{slot}/set` (and cmd `bind.set`). Erase via stored bg. Max 8 slots. No CBOR. | **agreed** |
 | **W18** | Heap / fragmentation | Step **13**: no residual malloc in delta decode; static HTTP RX pool; `heap_free`/`heap_largest` on status. | **done** |
+| **W19** | Showcase demo | After feature set is in place (not before): one **full** host-driven demo that exercises the product end-to-end on glass (and SDL). Builds on `wd_demo` / `wd_scene` — not a new stack. | **agreed** |
 
 ---
 
 ## Current snapshot
 
 Steps **0–13 done**. Flash deferred for glass QA (11–13 heap stats on device).
-**Next:** glass QA when board free; backlog B1 groups/batch, TLS, …
+**Next:** glass QA when board free; feature backlog (B1, …); then **B-showcase** / Step 14 (W19) when features feel complete.
 
 
 ---
@@ -372,6 +373,27 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 
 ---
 
+### Step 14 — Showcase demo (B-showcase)
+**Status:** `todo` · **Depends on:** feature backlog largely done (glass QA + at least L0/L1/binds/HTTP stable) · **Decision:** W19  
+**Do not start until explicit `go`** — this is the *after we have the features* victory lap, not a substitute for missing capabilities.
+
+**Intent:** one **fantastic** end-to-end demo script (host) that feels like a product trailer on CYD (+ SDL):
+
+| Beat | Show |
+|------|------|
+| Boot / clear | Color washes, L0 confidence |
+| UI chrome | `fill_rect` + `draw.text` layout |
+| Live values | Bind slots ticking (clock, fake sensors, MQTT `bind/+/set`) |
+| Big art | HTTP `uri` panels (auto-encoded assets) — not endless MQTT photo tiles |
+| Motion | Dirty-rect animation / scene pacing that reads as intentional |
+| Multi-device | Optional second id if available |
+
+**Deliverables (when scheduled):** `tools/wd_showcase.py` and/or `tools/scenes/showcase.yaml` + short README “run this”; `make showcase` / `showcase-sim`. Prefer composing existing inject/scene/asset paths over a parallel stack.
+
+**Done when:** one command demos the story on sim and on glass; docs point to it as the flagship path.
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
@@ -390,6 +412,7 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 | B-s3 | Build/verify profile #2 (S3+PSRAM) when hardware appears |
 | B-demo-text | Demo banner font — **fixed** Step 8a (`wd_text.py`) |
 | B-mem | Heap harden — **done** Step 13 (stream decode, static HTTP pool, status heap) |
+| B-showcase | Full fantastic demo script — **Step 14** (W19); after features, not instead of them |
 
 ---
 
@@ -442,3 +465,4 @@ make build flash monitor   # IDF device (later)
 3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
 4. Step 10 path: **B-http** (locked). Step 11 early L1: **W16** (fill_rect + text).
 5. Step 13 (W18 heap) — **done** (host + IDF build; glass heap measure when flashable).
+6. Showcase demo (W19 / Step 14 / B-showcase) — **after** features; wait for explicit `go`.
