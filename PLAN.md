@@ -125,8 +125,8 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–13, 15 done**. Flash deferred for glass QA.
-**Next:** glass QA when board free; **Step 16** (W21) extract delta lab → **Step 17** remove from product; showcase (Step 14) when ready.
+Steps **0–13, 15–16 done**. Flash deferred for glass QA.
+**Next:** **Step 17** (W21 remove delta from product) on `go`; glass QA when board free; Step 14 showcase when ready.
 
 
 ---
@@ -410,20 +410,12 @@ Host TDD first. No value binds (B2), no groups/batch, no LVGL.
 ---
 
 ### Step 16 — Extract `delta_rle` lab project (W21)
-**Status:** `todo` · **Decision:** W21  
-**Do not start until explicit `go`.**
+**Status:** `done` · **Decision:** W21  
 
-Stand up a **new** repo (sibling, e.g. `~/Projects/delta-rle-lab` or Cursor-hosted) that owns the compression experiment **outside** the display product:
+**Lab:** [`../delta-rle-lab`](../delta-rle-lab) (`/home/davidl/Projects/delta-rle-lab`) — host `make test` / `make bench` green.  
+Copied: `components/codec`, `host/codec` (+ corpus), benches, `delta_rle_v1.md`, codec-harness. wl-display still ships delta until Step 17.
 
-| Carry over | From wl-display |
-|------------|-----------------|
-| Pure C codec | `components/codec` (raw + delta_rle + auto) |
-| Host tests / benches | `host/codec`, corpus gen, `docs/benches/*`, `docs/contract/delta_rle_v1.md` |
-| Notes | freeze rationale, harness design (`docs/codec-harness.md`) |
-
-Lab is host-first (gcc); no MQTT/CYD required. README: “archived from esp32-wl-display; safe place to resume Huffman/YUV/v2.”
-
-**Done when:** new repo builds `make test` / `make bench`; wl-display still unchanged (still ships delta until Step 17).
+**Done when:** new repo builds `make test` / `make bench`; wl-display still unchanged. ✓
 
 ---
 
@@ -449,7 +441,7 @@ Product wire: **`enc=0` raw only** for `raster.rect` (inline + URI). Drop delta 
 | B4 | Touch events upward (reuse invaders touch later) |
 | B5 | Image sequence / P-frame compression |
 | B6 | Huffman / YUV plane modes on delta_rle → **lab repo** (Step 16), not product |
-| B-codec-lab | Extract delta_rle lab — **Step 16** (W21) |
+| B-codec-lab | Extract delta_rle lab — **done** Step 16 → `../delta-rle-lab` |
 | B-codec-drop | Remove delta from wl-display — **Step 17** (W21; after 16) |
 | B7 | Shared HAL component repo (if copy drifts) |
 | B8 | OTA |
@@ -524,4 +516,4 @@ make build flash monitor   # IDF device (later)
 5. Step 13 (W18 heap) — **done** (host + IDF build; glass heap measure when flashable).
 6. Showcase demo (W19 / Step 14 / B-showcase) — **after** features; wait for explicit `go`.
 7. B1 draw.batch + groups (W20 / Step 15) — **done**.
-8. Delta exit (W21): Step **16** extract lab → Step **17** remove from product — wait for `go`.
+8. Delta exit (W21): Step **16** lab extract — **done** (`../delta-rle-lab`); Step **17** remove from product — wait for `go`.
