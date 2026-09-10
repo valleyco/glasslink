@@ -543,16 +543,12 @@ def cmd_inject(args: argparse.Namespace) -> int:
             print(f"published {len(raw)} B → {t}")
             return 0
         elif args.subcmd == "batch":
-            import json
-
             ops = json.loads(Path(args.ops).read_text())
             if not isinstance(ops, list):
                 raise ValueError("--ops JSON must be a list")
             payload = pack_batch(args.id, args.seq, ops)
             check_inline_max(payload, enforce=True)
         elif args.subcmd == "group-define":
-            import json
-
             ops = json.loads(Path(args.ops).read_text())
             if not isinstance(ops, list):
                 raise ValueError("--ops JSON must be a list")
