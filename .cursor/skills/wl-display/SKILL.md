@@ -32,7 +32,7 @@ Device (ESP-IDF)
 | W3/W13 | Copy minimal HAL; shared `hal_display.h` + two link backends |
 | W4 | No touch v1 |
 | W5 | Pure L0 + clear |
-| W6 | raw + delta_rle_v1 (measured) |
+| W6 | raw + delta_rle_v1 (measured) — **exit path W21** (lab then remove) |
 | W7 | Inline MQTT first |
 | W9 | Custom binary header (not CBOR) |
 | W10 | No TLS day one |
