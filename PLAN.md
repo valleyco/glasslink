@@ -102,7 +102,7 @@ No production feature lands without a failing host test written first (except pu
 | **W1** | First board | **Primary:** ESP32-2432S028R CYD V3 — ST7789, 320×240, WROOM, 4 MB flash, **no PSRAM**. **Profile #2 (documented only for v1):** ESP32-S3 + PSRAM capable panel — same contract/`display_profile`; optional full-FB path later. No S3 hardware required to proceed. | **agreed** |
 | **W2** | Firmware stack | **ESP-IDF** + Make (invaders-style), `esp_lcd` ST7789, **esp-mqtt**. HTTP client **not** in first E2E (see W7). Not Arduino/PlatformIO for v1. | **agreed** |
 | **W3** | Display HAL reuse | **Copy minimal display-only** HAL + provenance note (“from invaders @ date”). Shared `hal_display.h`; **two link backends** (SPI device / host fake) — **no vtable**. Submodule later if drift hurts. | **agreed** |
-| **W4** | Touch in v1 | **No** | **agreed** |
+| **W4** | Touch in v1 | **No** for first ship. **Next milestone (B4 / Step 18):** upward touch — device emits raw events; host owns hit-regions + context. | **agreed** (reopen scheduled) |
 | **W5** | v1 display language | **Simplest: pure L0** + `display.clear` only. No fill/text draw ops in v1. L1/L2 names may appear in docs as reserved; not implemented. | **agreed** |
 | **W6** | v1 codecs | `raw_rgb565` baseline + **`delta_rle_v1`**. TDD order: raw → RLE → delta+RLE. Bench vs QOI/JPEG later. | **agreed** |
 | **W7** | Large payloads | **Simplest first: MQTT inline only.** Raise esp-mqtt buffer; stay under `inline_max`. **HTTP URI pull = later phase** (still in architecture; not first E2E). No MQTT chunking. | **agreed** |
@@ -125,8 +125,9 @@ No production feature lands without a failing host test written first (except pu
 
 ## Current snapshot
 
-Steps **0–17 done** (Step 14 showcase host path ready; glass/SDL eyeball when you can).
-**Next:** glass QA when board free; `make panel-sim` / `make showcase-sim` when DISPLAY available; other backlog.
+Steps **0–17 done**. Panel + showcase host paths ready.
+**Next milestone:** **Touch upward (B4 → Step 18)** — discuss/lock wire + host hit-test/context, then `go`.  
+Also: glass QA when board free; `make panel-sim` / `showcase-sim` when DISPLAY available.
 
 
 ---
@@ -436,7 +437,7 @@ Product wire: **`enc=0` raw only**. Delta encode/decode/tools/docs removed; stat
 | B2 | MQTT value binds → text slots — **done** Step 12 |
 | B3 | TLS / credentials on device — **declined for LAN product** (W10); revisit only if public-broker threat model |
 | B-wg | WireGuard on device (`esp_wireguard`) — **backlog**; after product polish + measured `heap_free`/`heap_largest` headroom. Prefer gateway WG until then. |
-| B4 | Touch events upward (reuse invaders touch later) |
+| B4 | Touch events upward — **next milestone** (Step 18). Device: raw press/move/release + x,y over MQTT. Host: per-device **context** + hit-regions → actions. Reuse invaders touch HAL when on glass. |
 | B5 | Image sequence / P-frame compression |
 | B6 | Huffman / YUV plane modes on delta_rle → **lab repo** (Step 16), not product |
 | B-codec-lab | Extract delta_rle lab — **done** Step 16 → `../delta-rle-lab` |
@@ -517,3 +518,4 @@ make build flash monitor   # IDF device (later)
 7. B1 draw.batch + groups (W20 / Step 15) — **done**.
 8. Delta exit (W21): Steps **16–17** **done** (lab `../delta-rle-lab`; product raw-only).
 9. WireGuard (**B-wg**): backlog after product + heap headroom; TLS stays out (W10).
+10. **Next milestone:** Touch (**B4** / Step 18) — raw device events; host hit-regions + context (multi-client daemon). Not scheduled until discuss → `go`.
