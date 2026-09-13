@@ -66,6 +66,10 @@ Device firmware (`components/wd_net`) uses the same topics once provisioned.
 
 ESP32 stores config in **NVS** flash (namespace `wd`). Do not commit secrets.
 
+**Field provision (preferred on desk):** SoftAP `glasslink-setup` → http://192.168.4.1/ — see [`docs/plans/provision.md`](../plans/provision.md).
+
+**USB seed (lab/factory):**
+
 ```bash
 cp tools/nvs.example.csv tools/nvs.csv   # edit SSID/pass/broker
 # IDF env active:

@@ -31,6 +31,16 @@ esp_err_t wd_cfg_load(wd_cfg_t *out);
 /** Write all fields to NVS (namespace "wd"). */
 esp_err_t wd_cfg_save(const wd_cfg_t *cfg);
 
+/** True if SSID empty or placeholder — SoftAP provision required. */
+int wd_cfg_needs_provision(const wd_cfg_t *cfg);
+
+/**
+ * Apply URL-decoded form fields into cfg (only keys present are overwritten).
+ * Keys: wifi_ssid, wifi_pass, mqtt_uri, device_id.
+ * Returns 0 on success, -1 on bad input / missing required ssid.
+ */
+int wd_cfg_apply_form(wd_cfg_t *cfg, const char *body, size_t body_len);
+
 #ifdef __cplusplus
 }
 #endif

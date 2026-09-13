@@ -4,7 +4,7 @@ Flagship product showcase (Step 14 / W19; draw stack Steps 19–22).
 
 Beats: color wash → L1 chrome (batch + groups) → live binds → HTTP URI art
 → poly / pen / Bézier / charts → dirty-rect motion → finale.
-Composes wd_mqtt pack/publish helpers + wd_charts recipes.
+Uses the glasslink Python SDK.
 
 Examples:
   ./tools/wd_showcase.py --dry-run              # pack + asset only (no broker)
@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import http.server
-import json
 import math
 import os
 import socket
@@ -47,8 +46,14 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import wd_charts as charts  # noqa: E402
-import wd_mqtt as wm  # noqa: E402
+from _sdk_path import ensure_sdk_path  # noqa: E402
+
+ensure_sdk_path()
+import glasslink as gl  # noqa: E402
+from glasslink import charts  # noqa: E402
+from glasslink.client import AckGate  # noqa: E402
+
+wm = gl  # pack/topic helpers (same names as legacy wd_mqtt)
 
 PANEL_W, PANEL_H = 320, 240
 ART_W, ART_H = 160, 120
@@ -148,82 +153,6 @@ def publish(client, devices: list[str], payload: bytes) -> None:
         info.wait_for_publish(timeout=5)
         if not info.is_published():
             raise TimeoutError(f"MQTT publish timeout → {d}")
-
-
-class AckGate:
-    """Serialize host pacing on device apply+ack (critical after FLAG_URI HTTP)."""
-
-    def __init__(self, devices: list[str]) -> None:
-        self.devices = list(devices)
-        self._lock = threading.Lock()
-        self._wait: dict[tuple[str, int, int], threading.Event] = {}
-        self._body: dict[tuple[str, int, int], dict] = {}
-
-    def attach(self, client) -> None:
-        for d in self.devices:
-            client.subscribe(wm.topic_ack(d), qos=0)
-
-        def on_message(_c, _u, msg) -> None:
-            topic = msg.topic
-            try:
-                body = json.loads(msg.payload.decode())
-            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
-                return
-            try:
-                mid = int(body.get("id", -1))
-                seq = int(body.get("seq", -1))
-            except (TypeError, ValueError):
-                return
-            for d in self.devices:
-                if topic != wm.topic_ack(d):
-                    continue
-                key = (d, mid, seq)
-                with self._lock:
-                    ev = self._wait.get(key)
-                    if ev is None:
-                        return
-                    self._body[key] = body
-                ev.set()
-                return
-
-        client.on_message = on_message
-        time.sleep(0.05)
-
-    def publish(
-        self, client, payload: bytes, *, timeout: float = 5.0, label: str = "",
-        allow_nack: bool = False,
-    ) -> int | None:
-        mid, seq = wm.peek_id_seq(payload)
-        events: list[tuple[tuple[str, int, int], threading.Event]] = []
-        for d in self.devices:
-            key = (d, mid, seq)
-            ev = threading.Event()
-            with self._lock:
-                self._wait[key] = ev
-                self._body.pop(key, None)
-            events.append((key, ev))
-            info = client.publish(wm.topic_cmd(d), payload, qos=1)
-            info.wait_for_publish(timeout=5)
-            if not info.is_published():
-                raise TimeoutError(f"MQTT publish timeout → {d}")
-        last_rc: int | None = None
-        for key, ev in events:
-            if not ev.wait(timeout=timeout):
-                raise TimeoutError(
-                    f"ack timeout {label or 'cmd'} id={mid} seq={seq} device={key[0]}"
-                )
-            with self._lock:
-                body = self._body.pop(key, {})
-                self._wait.pop(key, None)
-            rc = int(body.get("rc", -1))
-            last_rc = rc
-            if rc != 0:
-                msg = f"device nack {label or 'cmd'} rc={rc} id={mid} seq={seq}"
-                if allow_nack:
-                    print(f"  warn: {msg}")
-                else:
-                    raise RuntimeError(msg)
-        return last_rc
 
 
 def bind_topic(client, devices: list[str], slot: int, text: str) -> None:
@@ -431,7 +360,7 @@ def run_showcase(args: argparse.Namespace) -> int:
         gate.attach(client)
 
         # Play beats with pacing (rebuild seq for live path).
-        # Always wait for device ack so FLAG_URI HTTP can't race past later beats.
+        # Ack on scene boundaries / URI; fire-and-forget for washes + motion frames.
         seq = 1
 
         def send(
@@ -445,11 +374,16 @@ def run_showcase(args: argparse.Namespace) -> int:
                 client, payload, timeout=timeout, label=label, allow_nack=allow_nack
             )
 
+        def send_fast(payload: bytes) -> None:
+            publish(client, devices, payload)
+
         beat("1 color washes")
         for color in (0x0011, 0xF800, 0x07E0, 0x001F, 0x0000):
-            send(wm.pack_clear(cmd_id, seq, color), label="clear")
+            send_fast(wm.pack_clear(cmd_id, seq, color))
             seq += 1
-            time.sleep(0.35)
+            time.sleep(0.22)
+        send(wm.pack_clear(cmd_id, seq, 0x0000), label="wash sync")
+        seq += 1
 
         beat("2 L1 batch chrome")
         send(wm.pack_batch(cmd_id, seq, batch_ops), label="batch chrome")
@@ -510,7 +444,7 @@ def run_showcase(args: argparse.Namespace) -> int:
             bind_topic(client, devices, 0, clock)
             bind_topic(client, devices, 1, temp)
             print(f"  bind tick {clock} {temp}")
-            time.sleep(0.45)
+            time.sleep(0.35)
 
         beat("5 HTTP URI art")
         send(wm.pack_clear(cmd_id, seq, 0x0000), label="clear")
@@ -552,34 +486,52 @@ def run_showcase(args: argparse.Namespace) -> int:
         for label, ops in draw_stack_batches():
             send(wm.pack_batch(cmd_id, seq, ops), label=label)
             seq += 1
-            time.sleep(max(1.8, pause * 2.0))
-        time.sleep(pause * 0.5)
+            time.sleep(max(1.5, pause * 1.8))
+        time.sleep(pause * 0.4)
 
         beat("7 dirty-rect motion")
-        send(wm.pack_clear(cmd_id, seq, 0x10A2), label="motion clear")
-        seq += 1
         send(
-            wm.pack_text(cmd_id, seq, 8, 8, 0xFFE0, "MOTION", scale=2),
-            label="motion title",
+            wm.pack_batch(
+                cmd_id,
+                seq,
+                [
+                    {"fill": {"x": 0, "y": 0, "w": 320, "h": 240, "color": 0x10A2}},
+                    {
+                        "text": {
+                            "x": 8,
+                            "y": 8,
+                            "color": 0xFFE0,
+                            "scale": 2,
+                            "text": "MOTION",
+                        }
+                    },
+                ],
+            ),
+            label="motion setup",
         )
         seq += 1
-        for i in range(24):
+        # One batch/frame (erase+draw); no per-op ack — host frame timer only.
+        frames = 36
+        frame_dt = 0.028
+        for i in range(frames):
             x = 8 + (i * 12) % 280
-            send(
-                wm.pack_fill_rect(cmd_id, seq, x, 100, 40, 24, 0x07E0),
-                label="motion fill",
-            )
-            seq += 1
+            ops: list = []
             if i > 0:
                 px = 8 + ((i - 1) * 12) % 280
-                send(
-                    wm.pack_fill_rect(cmd_id, seq, px, 100, 40, 24, 0x10A2),
-                    label="motion erase",
+                ops.append(
+                    {"fill": {"x": px, "y": 100, "w": 40, "h": 24, "color": 0x10A2}}
                 )
-                seq += 1
-            time.sleep(0.06)
+            ops.append({"fill": {"x": x, "y": 100, "w": 40, "h": 24, "color": 0x07E0}})
+            send_fast(wm.pack_batch(cmd_id, seq, ops))
+            seq += 1
+            time.sleep(frame_dt)
+        send(
+            wm.pack_fill_rect(cmd_id, seq, 8, 100, 40, 24, 0x10A2),
+            label="motion sync",
+        )
+        seq += 1
 
-        time.sleep(pause * 0.6)
+        time.sleep(pause * 0.4)
         beat("8 finale")
         send(wm.pack_batch(cmd_id, seq, finale_ops), label="finale")
         seq += 1

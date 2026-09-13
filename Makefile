@@ -3,12 +3,12 @@
 IDF ?= idf.py
 PORT ?= /dev/ttyUSB0
 
-.PHONY: test test-render test-codec test-contract test-bind mqtt-loopback \
+.PHONY: test test-render test-codec test-contract test-bind test-net mqtt-loopback \
 	sim sim-mqtt demo demo-fetch demo-sim showcase showcase-sim panel panel-sim scene clean audit-mem \
 	build build-esp32 build-lcd-smoke build-mqtt \
 	flash flash-esp32 flash-lcd-smoke flash-mqtt flash-nvs monitor monitor-mqtt
 
-test: test-render test-codec test-contract test-bind
+test: test-render test-codec test-contract test-bind test-net
 
 test-render:
 	$(MAKE) -C host/render test
@@ -21,6 +21,9 @@ test-contract:
 
 test-bind:
 	$(MAKE) -C host/bind test
+
+test-net:
+	$(MAKE) -C host/net test
 
 # Host MQTT vs local Mosquitto (no device flash)
 mqtt-loopback:

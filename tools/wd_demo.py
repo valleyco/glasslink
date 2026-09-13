@@ -45,7 +45,10 @@ except ImportError:
 
 # Import pack/publish helpers from sibling module
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import wd_mqtt as wm  # noqa: E402
+from _sdk_path import ensure_sdk_path  # noqa: E402
+
+ensure_sdk_path()
+import glasslink as wm  # noqa: E402
 import wd_text as wt  # noqa: E402
 
 PANEL_W, PANEL_H = 320, 240

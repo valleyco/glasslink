@@ -123,15 +123,19 @@ python3 -m http.server 8000 --directory tools/.cache/http
 
 Device id is a **configured name** (NVS key `device_id` / `CONFIG_WD_DEVICE_ID`, e.g. `cyd1`) — not derived from MAC. Host tools use `--device` or env `WD_DEVICE`. Topics: [`docs/contract/topics-v1.md`](docs/contract/topics-v1.md).
 
+**Python SDK:** [`sdk/python/glasslink`](sdk/python/) — `pip install -e sdk/python` (also via `tools/requirements.txt`). Demos import `glasslink`; CLI: `glasslink inject …` or `./tools/wd_mqtt.py`.
+
 ```bash
 # ESP-IDF env sourced (e.g. source ~/Projects/esp-idf/export.sh)
-cp tools/nvs.example.csv tools/nvs.csv   # edit Wi-Fi + mqtt://<LAN-IP>:1883 + device_id
-make build-mqtt
-make flash-mqtt
-make flash-nvs                           # credentials → NVS (not EEPROM)
+make build-mqtt && make flash-mqtt
+# Optional factory seed (still supported):
+#   cp tools/nvs.example.csv tools/nvs.csv   # edit Wi-Fi + mqtt://…
+#   make flash-nvs
+# Or field provision: if SSID is CHANGE_ME / STA fails → SoftAP `glasslink-setup`
+#   join AP → http://192.168.4.1/  (see docs/plans/provision.md)
 ```
 
-Glass should show a blue boot bar, then green when MQTT is up. Inject:
+Glass should show a blue boot bar, then green when MQTT is up (red SETUP banner in SoftAP mode). Inject:
 
 ```bash
 ./tools/wd_mqtt.py inject clear --device cyd1 --color 0x001F
@@ -151,9 +155,10 @@ Glass should show a blue boot bar, then green when MQTT is up. Inject:
 | `components/codec` | raw RGB565 only (delta → `../delta-rle-lab`) |
 | `components/contract` | binary L0 parse/apply |
 | `components/render` / `board` | blit + ST7789 HAL |
-| `components/wd_net` | Wi-Fi + MQTT + NVS config |
+| `components/wd_net` | Wi-Fi + MQTT + NVS config + SoftAP provision |
 | `host/` | gcc tests, fake_display, SDL sim |
 | `tools/wd_mqtt.py` | inject / loopback / visual |
+| `tools/wd_provision.py` | POST config to SoftAP portal |
 | `tools/wd_panel.py` | clock + weather panel daemon |
 | `tools/wd_showcase.py` | Step 14 flagship demo |
 | `tools/wd_demo.py` | orchestrated photo demo |

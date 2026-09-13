@@ -9,6 +9,7 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
+#include "wd_form.h"
 
 #include <string.h>
 
@@ -44,6 +45,76 @@ static void copy_str(char *dst, size_t dst_sz, const char *src)
 static bool usable_ssid(const char *s)
 {
     return s && s[0] && strcmp(s, "CHANGE_ME") != 0;
+}
+
+int wd_cfg_needs_provision(const wd_cfg_t *cfg)
+{
+    if (!cfg) {
+        return 1;
+    }
+    return usable_ssid(cfg->wifi_ssid) ? 0 : 1;
+}
+
+int wd_cfg_apply_form(wd_cfg_t *cfg, const char *body, size_t body_len)
+{
+    char buf[WD_CFG_PASS_MAX + 1];
+    int rc;
+
+    if (!cfg || !body) {
+        return -1;
+    }
+
+    rc = wd_form_get_field(body, body_len, "wifi_ssid", buf, sizeof(buf));
+    if (rc < 0) {
+        return -1;
+    }
+    if (rc == 0) {
+        if (strlen(buf) > WD_CFG_SSID_MAX) {
+            return -1;
+        }
+        copy_str(cfg->wifi_ssid, sizeof(cfg->wifi_ssid), buf);
+    }
+
+    rc = wd_form_get_field(body, body_len, "wifi_pass", buf, sizeof(buf));
+    if (rc < 0) {
+        return -1;
+    }
+    if (rc == 0) {
+        copy_str(cfg->wifi_pass, sizeof(cfg->wifi_pass), buf);
+    }
+
+    rc = wd_form_get_field(body, body_len, "mqtt_uri", buf, sizeof(buf));
+    if (rc < 0) {
+        return -1;
+    }
+    if (rc == 0) {
+        if (strlen(buf) > WD_CFG_URI_MAX) {
+            return -1;
+        }
+        if (strncmp(buf, "mqtt://", 7) != 0) {
+            return -1;
+        }
+        copy_str(cfg->mqtt_uri, sizeof(cfg->mqtt_uri), buf);
+    }
+
+    rc = wd_form_get_field(body, body_len, "device_id", buf, sizeof(buf));
+    if (rc < 0) {
+        return -1;
+    }
+    if (rc == 0) {
+        if (strlen(buf) == 0 || strlen(buf) > WD_CFG_ID_MAX) {
+            return -1;
+        }
+        copy_str(cfg->device_id, sizeof(cfg->device_id), buf);
+    }
+
+    if (!usable_ssid(cfg->wifi_ssid)) {
+        return -1;
+    }
+    if (!cfg->mqtt_uri[0] || !cfg->device_id[0]) {
+        return -1;
+    }
+    return 0;
 }
 
 static esp_err_t nvs_get_str_key(nvs_handle_t h, const char *key, char *out,

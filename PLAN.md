@@ -124,14 +124,16 @@ No production feature lands without a failing host test written first (except pu
 | **W23** | Draw cursor / current position | Device keeps a **graphics pen state**: `(x,y)` current position (+ later optional color/stroke). Ops: `move_to` / `line_to` (and path ops below) update it. Absolute coords remain valid; relative drawing uses the pen. Reset on `display.clear`. Batch/group may inherit or snapshot pen — detail at step discuss. | **done** |
 | **W24** | L1 path strokes | After W22/W23: **`line`**, **quadratic/cubic Bézier** (stroked, capped segments), optional arc. Built on pen state. No AA in first cut. | **done** |
 | **W25** | Charts as compositions | **Gauge / bar / pie** are **not** first-class device opcodes initially. Host (or later L2) composes them from fill_rect, poly, arcs/bézier, text, binds. Optional later: thin `chart.*` helpers on host only, or device macros if measured demand. | **done** |
+| **W26** | Field provision (no USB flash) | **SoftAP + HTTP** bootstrap: if NVS Wi‑Fi missing/`CHANGE_ME` **or** STA connect fails → AP `glasslink-setup`, form + `POST /config` → `wd_cfg_save` → reboot. `flash-nvs` remains for factory/dev. STA online REST tweaks = follow-on. No TLS (W10). | **agreed** |
+| **W27** | Host app SDKs | **Python package first** (`sdk/python/glasslink`): pack + MQTT client + charts; demos/CLIs use it. **Node** matching API = follow-on (`B-sdk-node`). Not a UI toolkit. | **agreed** |
 
 ---
 
 ## Current snapshot
 
-Steps **0–17, 19–22 done**. Panel + showcase on glass.
-**Next milestone:** **Touch upward (B4 → Step 18)** — discuss/lock wire + host hit-test/context, then `go`.  
-Flash firmware after Steps 19–22 to get poly/pen/path on device.
+Steps **0–17, 19–24 done** (24 = Python SDK). SoftAP provision in tree.
+**Next product milestone:** **Touch upward (B4 → Step 18)** — discuss/lock wire, then `go`.
+Node SDK (`B-sdk-node`) backlog.
 
 
 ---
@@ -470,6 +472,34 @@ Host recipes: [`tools/wd_charts.py`](tools/wd_charts.py) — `bar_graph`, `gauge
 
 ---
 
+### Step 23 — SoftAP + HTTP provision (W26 / B-provision)
+**Status:** `done` · **Depends on:** NVS `wd_cfg_*` · **Decision:** W26  
+
+**Intent:** configure Wi‑Fi SSID/pass, MQTT URI, device id **without** `flash-nvs` / USB when possible.
+
+| Slice | Intent | Result |
+|-------|--------|--------|
+| 23a | Unprovisioned / STA timeout → SoftAP | ✓ `wd_net` |
+| 23b | `GET /` + `POST /config` → NVS + reboot | ✓ `wd_provision` |
+| 23c | Glass SETUP UI + docs + `wd_provision.py` | ✓ |
+
+Host form parse: `make test-net`. Doc: [`docs/plans/provision.md`](docs/plans/provision.md).
+
+---
+
+### Step 24 — Python host SDK (W27 / B-sdk)
+**Status:** `done` · **Depends on:** contract pack surface · **Decision:** W27  
+
+| Slice | Result |
+|-------|--------|
+| 24a | Package [`sdk/python/glasslink`](sdk/python/) — protocol pack, topics, patterns, `AckGate`/`Device`, charts | ✓ |
+| 24b | CLI `glasslink` / `tools/wd_mqtt.py` shim; demos import `glasslink` | ✓ |
+| 24c | Host smoke `host/net/test_glasslink.py` | ✓ |
+
+**Not in this step:** Node SDK (`B-sdk-node`), publish to PyPI.
+
+---
+
 ### Step 7+ — Backlog (not scheduled)
 
 | ID | Item |
@@ -496,6 +526,9 @@ Host recipes: [`tools/wd_charts.py`](tools/wd_charts.py) — `bar_graph`, `gauge
 | B-demo-text | Demo banner font — **fixed** Step 8a (`wd_text.py`) |
 | B-mem | Heap harden — **done** Step 13 (stream decode, static HTTP pool, status heap) |
 | B-showcase | Full fantastic demo script — **done** Step 14 (W19); eyeball when DISPLAY/board free |
+| B-provision | SoftAP + HTTP field config — **done** Step 23 (W26) |
+| B-sdk | Python host SDK — **done** Step 24 (W27) · `sdk/python/glasslink` |
+| B-sdk-node | Node/TS host SDK (match Python API) — backlog |
 
 ---
 
@@ -554,7 +587,7 @@ make build flash monitor   # IDF device (later)
 
 ## Open questions (short list)
 
-1. Dev Wi-Fi/MQTT credentials: **NVS namespace `wd`** (agreed 2026-09-09) — load first; seed from Kconfig once; `make flash-nvs` for CSV provision. Secrets never in git.
+1. Dev Wi-Fi/MQTT credentials: **NVS namespace `wd`** — load first; seed from Kconfig; `make flash-nvs` **or** SoftAP provision (W26 / Step 23). Secrets never in git.
 2. Device id: **configured name** (NVS / `CONFIG_WD_DEVICE_ID`); host `WD_DEVICE` — **not** MAC suffix in v1 (Step 8c).
 3. Exact binary header layout — **settled** in Step 3 / [`docs/contract/cmd-v1.md`](docs/contract/cmd-v1.md).
 4. Step 10 path: **B-http** (locked). Step 11 early L1: **W16** (fill_rect + text).
@@ -563,6 +596,8 @@ make build flash monitor   # IDF device (later)
 7. B1 draw.batch + groups (W20 / Step 15) — **done**.
 8. Delta exit (W21): Steps **16–17** **done** (lab `../delta-rle-lab`; product raw-only).
 9. WireGuard (**B-wg**): backlog after product + heap headroom; TLS stays out (W10).
-10. **Next milestone:** Touch (**B4** / Step 18) — raw device events; host hit-regions + context (multi-client daemon). Not scheduled until discuss → `go`.
+10. **Next product milestone:** Touch (**B4** / Step 18) — raw device events; host hit-regions + context. Not scheduled until discuss → `go`.
 11. **L1 polygon (W22 / Step 19)** — **done**.
 12. **Draw pen (W23 / Step 20)**, **line/Bézier (W24 / Step 21)**, **charts compose (W25 / Step 22)** — **done**.
+13. **Field provision (W26 / Step 23)** — SoftAP + HTTP → NVS — **done**.
+14. **Python SDK (W27 / Step 24)** — `sdk/python/glasslink` + demo refactor — **done**. Node = `B-sdk-node`.
