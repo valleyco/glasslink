@@ -31,3 +31,10 @@ tools/.venv/
 __pycache__/
 *.pyc
 host/bind/test_bind
+host/net/test_wd_form
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+.eggs/

@@ -1,5 +1,0 @@
-paho-mqtt>=2.1.0
-
-[tools]
-Pillow>=10
-PyYAML>=6
